@@ -81,7 +81,7 @@ body{background:#0a1a0f;font-family:'Lato',sans-serif;min-height:100vh;overflow:
       <div class="lvl-num">2</div>
       <div class="info">
         <div class="lvl-name">Mossy Ascent</div>
-        <div class="lvl-desc">Arena tembakan — dodge serangan musuh dari atas!</div>
+        <div class="lvl-desc">20 tangga + musuh tembak &mdash; gunakan A/D untuk menghindar!</div>
       </div>
       <div class="right">
         <div class="stars-row">
@@ -146,17 +146,17 @@ body{background:#0a1a0f;font-family:'Lato',sans-serif;min-height:100vh;overflow:
 </div>
 
 <script>
-const sts=document.getElementById('stars');
-for(let i=0;i<55;i++){
-  const s=document.createElement('div');
-  const sz=1+Math.random()*2;
-  s.style.cssText=`position:absolute;top:${Math.random()*100}%;left:${Math.random()*100}%;width:${sz}px;height:${sz}px;background:#fff;border-radius:50%;--dur:${2+Math.random()*3}s;--min:${0.1+Math.random()*0.2};--max:${0.5+Math.random()*0.4};animation:twinkle var(--dur) ease-in-out infinite alternate;`;
+var sts=document.getElementById('stars');
+for(var i=0;i<55;i++){
+  var s=document.createElement('div');
+  var sz=1+Math.random()*2;
+  s.style.cssText='position:absolute;top:'+Math.random()*100+'%;left:'+Math.random()*100+'%;width:'+sz+'px;height:'+sz+'px;background:#fff;border-radius:50%;--dur:'+(2+Math.random()*3)+'s;--min:'+(0.1+Math.random()*0.2)+';--max:'+(0.5+Math.random()*0.4)+';animation:twinkle var(--dur) ease-in-out infinite alternate;';
   sts.appendChild(s);
 }
-const ff=document.getElementById('ff');
-for(let i=0;i<12;i++){
-  const f=document.createElement('div');
-  f.style.cssText=`position:absolute;top:${20+Math.random()*60}%;left:${10+Math.random()*80}%;width:4px;height:4px;background:#9effa9;border-radius:50%;filter:blur(1px);box-shadow:0 0 8px #5dd668;--dur:${7+Math.random()*6}s;--x1:${-60+Math.random()*120}px;--y1:${-40+Math.random()*80}px;--x2:${-60+Math.random()*120}px;--y2:${-40+Math.random()*80}px;animation:fly var(--dur) linear infinite;animation-delay:${Math.random()*8}s;`;
+var ff=document.getElementById('ff');
+for(var i=0;i<12;i++){
+  var f=document.createElement('div');
+  f.style.cssText='position:absolute;top:'+(20+Math.random()*60)+'%;left:'+(10+Math.random()*80)+'%;width:4px;height:4px;background:#9effa9;border-radius:50%;filter:blur(1px);box-shadow:0 0 8px #5dd668;--dur:'+(7+Math.random()*6)+'s;--x1:'+(-60+Math.random()*120)+'px;--y1:'+(-40+Math.random()*80)+'px;--x2:'+(-60+Math.random()*120)+'px;--y2:'+(-40+Math.random()*80)+'px;animation:fly var(--dur) linear infinite;animation-delay:'+Math.random()*8+'s;';
   ff.appendChild(f);
 }
 </script>

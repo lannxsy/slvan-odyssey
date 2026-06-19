@@ -1281,7 +1281,9 @@ const int   L2_MAX=20;
 const float L2_GY =0.0f;  // ground Y
 
 static void l2_spawnWall(float delayOverride=-1.0f){
-    if((int)l2_walls.size()>4) return; // max 5 wall di layar
+    int activeCount=0;
+    for(auto& w0:l2_walls) if(w0.alive&&!w0.isFrozen) activeCount++;
+    if(activeCount>4) return; // max 5 wall AKTIF (belum diinjak) di layar
     L2Wall w;
     w.id=l2_wallId++;
     w.height=0.16f;

@@ -102,7 +102,7 @@ for(var j=0;j<15;j++){var f=document.createElement('div');f.className='firefly';
 // LEVEL_HTML sekarang di-generate secara dinamis lewat fungsi di bawah
 // agar status locked/unlocked bisa diupdate berdasarkan progress pemain.
 
-static std::string buildLevelHTML(bool lvl1cleared, bool lvl2cleared) {
+static std::string buildLevelHTML(bool lvl1cleared, bool lvl2cleared, bool lvl3cleared) {
     // Helper lambda untuk generate satu kartu level
     auto card = [](int num, const char* name, const char* desc,
                    const char* invoke, bool unlocked, bool cleared) -> std::string {
@@ -185,8 +185,8 @@ body{background:#0a1a0f;font-family:serif;min-height:100vh;overflow:hidden;posit
                  "Arena tembakan - dodge serangan musuh dari atas!",
                  "startLevel2", lvl1cleared, lvl2cleared);
     html += card(3, "Canopy Rush",
-                 "Kecepatan penuh di puncak kanopi",
-                 "startLevel3", lvl2cleared, false);
+                 "30 tangga menjulang + musuh penembak &mdash; jangan lengah!",
+                 "startLevel3", lvl2cleared, lvl3cleared);
     html += card(4, "Thornwood Surge",
                  "Duri dan rintangan ganda",
                  "startLevel4", false, false);
@@ -1526,7 +1526,7 @@ bool runGame2(){
             l2_exPhase+=dt*1.5f;
             float eY=l2p.standingY+5.5f+sinf(l2_exPhase)*0.4f;
 
-            float intv=std::max(0.7f,2.0f-l2_wallsPassed*0.05f);
+            float intv=std::max(0.85f,2.3f-l2_wallsPassed*0.045f);
             l2_exShoot+=dt;
             if(l2_exShoot>=intv){
                 l2_exShoot=0;
@@ -1622,7 +1622,7 @@ bool runGame2(){
         dC(sp2,glm::vec3(l2_exX-0.25f,eYr+0.22f,0.45f),glm::vec3(0.06f,0.06f,0.1f),glm::vec3(0.05f,0.05f,0.05f));
         dC(sp2,glm::vec3(l2_exX+0.25f,eYr+0.22f,0.45f),glm::vec3(0.06f,0.06f,0.1f),glm::vec3(0.05f,0.05f,0.05f));
         // Charge indicator
-        float si2=std::min(l2_exShoot/std::max(0.7f,2.0f-l2_wallsPassed*0.05f),1.0f);
+        float si2=std::min(l2_exShoot/std::max(0.85f,2.3f-l2_wallsPassed*0.045f),1.0f);
         dC(sp2,glm::vec3(l2_exX,eYr-0.62f,0.5f),glm::vec3(0.12f*si2+0.02f,0.12f*si2+0.02f,0.05f),
            glm::mix(glm::vec3(0.95f,0.8f,0.1f),glm::vec3(0.95f,0.1f,0.1f),si2));
 
@@ -1736,18 +1736,525 @@ bool runGame2(){
     glfwTerminate();
     return l2_backToMenu;
 }
+
+// =============================================
+
+// =============================================
+// LEVEL 3 - CANOPY RUSH
+// Identik dengan lvl2: platform bergerak, lompat
+// TAMBAHAN: A/D gerak, 1 musuh nembak, 30 tangga (lebih cepat & padat)
+// =============================================
+// =============================================
+// LEVEL 3 - CANOPY RUSH
+// State sepenuhnya TERPISAH dari Level 1 & 2.
+// Tidak ada shared globals (player, walls, cameraPos, dll)
+// Gameplay: naik 30 tangga + 1 musuh nembak. Hanya SPACE/lompat.
+// =============================================
+
+// (struct Bullet sudah dideklarasikan di Level 2 — dipakai bersama)
+
+// ── State L3 (semua lokal ke file ini) ──
+struct L3Player {
+    float y=0,velY=0,standingY=0,animTimer=0;
+    bool onGround=true;
+} l3p;
+
+struct L3Wall {
+    float x,y,width,height,speedSign,delayTimer;
+    int id;
+    bool passed,alive,isFrozen,waitingDelay;
+};
+
+static std::vector<L3Wall>  l3_walls;
+static std::vector<Bullet>  l3_bullets;
+static float  l3_camY=2.5f, l3_camTargetY=2.5f;
+static float  l3_playerX=0.0f;  // posisi X player (A/D)
+static bool   l3_keysHeld[512]={};
+static float  l3_wallSpeed=5.5f;
+static bool   l3_spawnRight=false;
+static int    l3_wallId=300;
+static int    l3_wallsPassed=0;
+static int    l3_lives=3;
+static float  l3_hitCD=0,l3_overlayT=0,l3_gameTime=0;
+static GameState l3_state=PLAYING;
+static bool   l3_backToMenu=false;
+
+// Enemy
+static float l3_exX=0,l3_exVelX=2.2f,l3_exPhase=0,l3_exShoot=0;
+
+const int   L3_MAX=30;
+const float L3_GY =0.0f;  // ground Y
+
+static void l3_spawnWall(float delayOverride=-1.0f){
+    int activeCount=0;
+    for(auto& w0:l3_walls) if(w0.alive&&!w0.isFrozen) activeCount++;
+    if(activeCount>4) return; // max 5 wall AKTIF (belum diinjak) di layar
+    L3Wall w;
+    w.id=l3_wallId++;
+    w.height=0.16f;
+    int stairNum=w.id-300+1;
+    w.width=9.0f-stairNum*0.35f; if(w.width<1.0f)w.width=1.0f;
+    w.y=l3p.standingY+0.75f;
+    w.speedSign=l3_spawnRight?-1.0f:1.0f;
+    l3_spawnRight=!l3_spawnRight;
+    float delay=delayOverride>=0?delayOverride:0.0f;
+    w.waitingDelay=(delay>0);
+    w.delayTimer=delay;
+    w.x=w.waitingDelay?9999.0f:(w.speedSign<0?16.0f:-16.0f);
+    w.passed=false; w.alive=true; w.isFrozen=false;
+    l3_walls.push_back(w);
+}
+
+static void l3_fullReset(){
+    l3p={};
+    l3_walls.clear(); l3_bullets.clear();
+    l3_camY=2.5f; l3_camTargetY=2.5f;
+    l3_wallSpeed=5.5f; l3_spawnRight=false; l3_wallId=300;
+    l3_wallsPassed=0; l3_lives=3;
+    l3_hitCD=0; l3_overlayT=0; l3_gameTime=0;
+    l3_state=PLAYING; l3_backToMenu=false;
+    l3_playerX=0.0f; memset(l3_keysHeld,0,sizeof(l3_keysHeld));
+    l3_exX=0; l3_exVelX=2.2f; l3_exPhase=0; l3_exShoot=0;
+    l3_spawnWall(1.2f); // tangga pertama muncul setelah 1.2 detik (Level 3)
+}
+
+void l3_key_callback(GLFWwindow* w,int key,int,int action,int){
+    if(key>=0&&key<512){ if(action==GLFW_PRESS) l3_keysHeld[key]=true; if(action==GLFW_RELEASE) l3_keysHeld[key]=false; }
+    if(action==GLFW_PRESS){
+        if((key==GLFW_KEY_SPACE||key==GLFW_KEY_UP||key==GLFW_KEY_W)
+            &&l3p.onGround&&l3_state==PLAYING){
+            l3p.velY=JUMP_FORCE; l3p.onGround=false;
+        }
+        if((key==GLFW_KEY_ESCAPE||key==GLFW_KEY_P)&&l3_state==PLAYING)  l3_state=PAUSED;
+        else if((key==GLFW_KEY_ESCAPE||key==GLFW_KEY_P)&&l3_state==PAUSED) l3_state=PLAYING;
+        if(key==GLFW_KEY_R&&(l3_state==GAME_OVER||l3_state==WIN||l3_state==PAUSED)) l3_fullReset();
+        if(key==GLFW_KEY_M){ l3_backToMenu=true; glfwSetWindowShouldClose(w,GLFW_TRUE); }
+    }
+}
+
+bool runGame3(){
+    l3_fullReset();
+
+    glfwInit();
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR,3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR,3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE,GLFW_OPENGL_CORE_PROFILE);
+    GLFWwindow* win=glfwCreateWindow(SCR_WIDTH,SCR_HEIGHT,
+        "Sylvan Odyssey - Level 3: Canopy Rush",NULL,NULL);
+#if defined(_WIN32)||defined(_WIN64)
+    { int sw=GetSystemMetrics(SM_CXSCREEN),sh=GetSystemMetrics(SM_CYSCREEN);
+      glfwSetWindowPos(win,(sw-(int)SCR_WIDTH)/2,(sh-(int)SCR_HEIGHT)/2); }
+#else
+    { GLFWmonitor* m=glfwGetPrimaryMonitor(); const GLFWvidmode* v=glfwGetVideoMode(m);
+      if(v) glfwSetWindowPos(win,(v->width-(int)SCR_WIDTH)/2,(v->height-(int)SCR_HEIGHT)/2); }
+#endif
+    glfwMakeContextCurrent(win);
+    glfwSetFramebufferSizeCallback(win,framebuffer_size_callback);
+    glfwSetKeyCallback(win,l3_key_callback);
+    gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
+    glEnable(GL_DEPTH_TEST); glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+
+    unsigned int sp3=makeShader(vertSrc,fragSrc);
+    unsigned int shp3=makeShader(vertSrc,shadowFragSrc);
+    unsigned int fp3=makeShader(fontVertSrc,fontFragSrc);
+
+    // Font textures — OpenGL context baru, harus init ulang
+    unsigned int fTex3=0,fVAO3=0,fVBO3=0,wTex3=0;
+    {
+        unsigned char atlas3[48][128]={};
+        for(int c=0;c<96;c++){ int col=c%16,row=c/16;
+            for(int y2=0;y2<8;y2++){ unsigned char bits=FONT8[c][y2];
+                for(int x2=0;x2<8;x2++) if(bits&(0x80>>x2)) atlas3[row*8+y2][col*8+x2]=255; }}
+        glGenTextures(1,&fTex3); glBindTexture(GL_TEXTURE_2D,fTex3);
+        glTexImage2D(GL_TEXTURE_2D,0,GL_RED,128,48,0,GL_RED,GL_UNSIGNED_BYTE,atlas3);
+        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
+        unsigned char w1=255;
+        glGenTextures(1,&wTex3); glBindTexture(GL_TEXTURE_2D,wTex3);
+        glTexImage2D(GL_TEXTURE_2D,0,GL_RED,1,1,0,GL_RED,GL_UNSIGNED_BYTE,&w1);
+        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
+        glGenVertexArrays(1,&fVAO3); glGenBuffers(1,&fVBO3);
+        glBindVertexArray(fVAO3); glBindBuffer(GL_ARRAY_BUFFER,fVBO3);
+        glBufferData(GL_ARRAY_BUFFER,sizeof(float)*6*4,NULL,GL_DYNAMIC_DRAW);
+        glVertexAttribPointer(0,2,GL_FLOAT,GL_FALSE,4*sizeof(float),(void*)0); glEnableVertexAttribArray(0);
+        glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,4*sizeof(float),(void*)(2*sizeof(float))); glEnableVertexAttribArray(1);
+        glBindVertexArray(0);
+    }
+    unsigned int VAO3,VBO3b;
+    glGenVertexArrays(1,&VAO3); glGenBuffers(1,&VBO3b);
+    glBindVertexArray(VAO3); glBindBuffer(GL_ARRAY_BUFFER,VBO3b);
+    glBufferData(GL_ARRAY_BUFFER,sizeof(cubeVerts),cubeVerts,GL_STATIC_DRAW);
+    glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,6*sizeof(float),(void*)0); glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1,3,GL_FLOAT,GL_FALSE,6*sizeof(float),(void*)(3*sizeof(float))); glEnableVertexAttribArray(1);
+
+    // ── Helpers 2D ──
+    auto qd=[&](float x,float y,float w,float h,float u0,float v0,float u1,float v1){
+        float vt[6][4]={{x,y+h,u0,v1},{x,y,u0,v0},{x+w,y,u1,v0},{x,y+h,u0,v1},{x+w,y,u1,v0},{x+w,y+h,u1,v1}};
+        glBindVertexArray(fVAO3); glBindBuffer(GL_ARRAY_BUFFER,fVBO3);
+        glBufferSubData(GL_ARRAY_BUFFER,0,sizeof(vt),vt); glDrawArrays(GL_TRIANGLES,0,6); };
+    auto rR=[&](float x,float y,float w,float h,float r,float g,float b,float a){
+        glUseProgram(fp3); glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D,wTex3);
+        glUniform1i(glGetUniformLocation(fp3,"tex"),0);
+        glUniform4f(glGetUniformLocation(fp3,"color"),r,g,b,a); qd(x,y,w,h,0,0,1,1); };
+    auto rT=[&](const std::string& s,float x,float y,float sc,float r=1,float g=1,float b=1,float a=1){
+        glUseProgram(fp3); glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D,fTex3);
+        glUniform1i(glGetUniformLocation(fp3,"tex"),0);
+        glUniform4f(glGetUniformLocation(fp3,"color"),r,g,b,a);
+        float cx=x;
+        for(char c:s){ if(c<32||c>127)c=32; int idx=c-32,col=idx%16,row=idx/16;
+            float u0=col/16.0f,u1=(col+1)/16.0f,v0=row*8/48.0f,v1=(row+1)*8/48.0f;
+            float vt[6][4]={{cx,y+8*sc,u0,v1},{cx,y,u0,v0},{cx+8*sc,y,u1,v0},
+                            {cx,y+8*sc,u0,v1},{cx+8*sc,y,u1,v0},{cx+8*sc,y+8*sc,u1,v1}};
+            glBindVertexArray(fVAO3); glBindBuffer(GL_ARRAY_BUFFER,fVBO3);
+            glBufferSubData(GL_ARRAY_BUFFER,0,sizeof(vt),vt); glDrawArrays(GL_TRIANGLES,0,6);
+            cx+=8*sc; } };
+    auto rH=[&](float x,float y,float s,bool f){
+        float r=f?0.95f:0.28f,g=f?0.15f:0.22f,b=f?0.18f:0.26f;
+        rR(x+s,y,s,s,r,g,b,1); rR(x+4*s,y,s,s,r,g,b,1);
+        rR(x,y+s,6*s,s,r,g,b,1); rR(x,y+2*s,6*s,s,r,g,b,1);
+        rR(x+s,y+3*s,4*s,s,r,g,b,1); rR(x+2*s,y+4*s,2*s,s,r,g,b,1);
+        rR(x+3*s,y+5*s,s,s,r,g,b,1); };
+    auto sU=[&](unsigned int p,const glm::mat4& pj,const glm::mat4& vw){
+        glUseProgram(p);
+        glUniformMatrix4fv(glGetUniformLocation(p,"projection"),1,GL_FALSE,glm::value_ptr(pj));
+        glUniformMatrix4fv(glGetUniformLocation(p,"view"),1,GL_FALSE,glm::value_ptr(vw)); };
+    auto dC=[&](unsigned int p,glm::vec3 pos,glm::vec3 sc,glm::vec3 col,float a=1.0f){
+        glUseProgram(p);
+        glm::mat4 m=glm::translate(glm::mat4(1),pos)*glm::scale(glm::mat4(1),sc);
+        glUniformMatrix4fv(glGetUniformLocation(p,"model"),1,GL_FALSE,glm::value_ptr(m));
+        glUniform3fv(glGetUniformLocation(p,"objectColor"),1,glm::value_ptr(col));
+        glUniform1f(glGetUniformLocation(p,"alpha"),a);
+        glBindVertexArray(VAO3); glDrawArrays(GL_TRIANGLES,0,36); };
+
+    // Awan
+    struct Cld{float x,y,z,spd;};
+    std::vector<Cld> clouds;
+    for(int i=0;i<5;i++) clouds.push_back({-12.0f+i*5.5f,5.5f+i*0.6f,-6.5f,0.4f+i*0.12f});
+
+    float lf=(float)glfwGetTime();
+
+    while(!glfwWindowShouldClose(win)){
+        float now=(float)glfwGetTime();
+        float dt=now-lf; if(dt>0.05f)dt=0.05f; lf=now;
+
+        // ── UPDATE ──
+        if(l3_state==PLAYING){
+            l3_gameTime+=dt; l3p.animTimer+=dt;
+            if(l3_hitCD>0) l3_hitCD-=dt;
+
+            // A/D movement
+            const float L3_MOVE=7.0f, L3_BOUND=7.5f;
+            if(l3_keysHeld[GLFW_KEY_A]||l3_keysHeld[GLFW_KEY_LEFT])  l3_playerX-=L3_MOVE*dt;
+            if(l3_keysHeld[GLFW_KEY_D]||l3_keysHeld[GLFW_KEY_RIGHT]) l3_playerX+=L3_MOVE*dt;
+            if(l3_playerX< -L3_BOUND) l3_playerX=-L3_BOUND;
+            if(l3_playerX>  L3_BOUND) l3_playerX= L3_BOUND;
+
+            // Fisika player
+            l3p.velY+=GRAVITY*dt;
+            l3p.y+=l3p.velY*dt;
+            bool localOn=false; float curFloor=L3_GY;
+
+            // Ground
+            if(l3p.y<=L3_GY){ l3p.y=L3_GY; l3p.velY=0; localOn=true; curFloor=L3_GY; }
+
+            // Collision tangga
+            const float LTOL=0.35f,STOL=0.15f;
+            bool doSpawn=false;
+            for(auto& w:l3_walls){
+                if(!w.alive) continue;
+                if(w.waitingDelay){
+                    w.delayTimer-=dt;
+                    if(w.delayTimer<=0){ w.waitingDelay=false; w.x=w.speedSign<0?16.0f:-16.0f; }
+                    continue;
+                }
+                if(!w.isFrozen) w.x+=w.speedSign*l3_wallSpeed*dt;
+                // Keluar layar
+                if((w.speedSign<0&&w.x<-16)||(w.speedSign>0&&w.x>16)){
+                    if(!w.isFrozen){ w.alive=false; } continue;
+                }
+                // X overlap (player di l3_playerX)
+                if(fabs(l3_playerX-w.x)>=PLAYER_HW+w.width) continue;
+                float pF=l3p.y, pH=l3p.y+PLAYER_H;
+                float wT=w.y+w.height, wB=w.y-w.height;
+                // Landing
+                if(l3p.velY<=0&&pF>=wT-LTOL&&pF<=wT+0.15f){
+                    if(!w.isFrozen&&!w.passed){
+                        w.isFrozen=true; w.passed=true;
+                        l3_wallsPassed++; doSpawn=true;
+                    }
+                    w.isFrozen=true;
+                    l3p.y=wT; l3p.velY=0;
+                    localOn=true; curFloor=wT;
+                }
+                // Side hit
+                else if(!w.isFrozen&&!w.passed&&l3_hitCD<=0&&pF<wT-STOL&&pH>wB+STOL){
+                    l3_lives--; w.isFrozen=true; w.alive=false; l3_hitCD=1.8f;
+                    if(l3_lives<=0){ l3_state=GAME_OVER; l3_overlayT=0; }
+                    // Spawn pengganti — player TIDAK reset posisi
+                    else{ L3Wall rep=w; rep.passed=false; rep.alive=true; rep.isFrozen=false;
+                          rep.waitingDelay=true; rep.delayTimer=1.0f; rep.x=9999;
+                          l3_walls.push_back(rep); }
+                }
+            }
+            l3_walls.erase(std::remove_if(l3_walls.begin(),l3_walls.end(),
+                [](const L3Wall& w){return !w.alive&&!w.waitingDelay;}),l3_walls.end());
+
+            l3p.onGround=localOn;
+            if(localOn){ l3p.standingY=curFloor; l3p.y=curFloor; l3p.velY=0; }
+
+            // WIN
+            if(l3_wallsPassed>=L3_MAX&&l3p.onGround&&l3_state==PLAYING){
+                l3_state=WIN; l3_overlayT=0;
+            }
+
+            // Spawn tangga berikutnya
+            if(doSpawn&&l3_state==PLAYING) l3_spawnWall(0.15f);
+
+            // Wall speed naik
+            l3_wallSpeed=5.5f+l3_wallsPassed*0.35f;
+
+            // Camera
+            l3_camTargetY=2.5f+l3p.standingY*0.85f;
+            l3_camY+=(l3_camTargetY-l3_camY)*4.0f*dt;
+
+            // Clouds
+            for(auto& c:clouds){ c.x-=c.spd*dt; if(c.x<-14)c.x=14; }
+
+            // Enemy melayang di atas player
+            l3_exX+=l3_exVelX*dt;
+            if(l3_exX>5.0f){ l3_exX=5.0f; l3_exVelX=-fabs(l3_exVelX); }
+            if(l3_exX<-5.0f){ l3_exX=-5.0f; l3_exVelX=fabs(l3_exVelX); }
+            l3_exPhase+=dt*1.5f;
+            float eY=l3p.standingY+5.5f+sinf(l3_exPhase)*0.4f;
+
+            float intv=std::max(0.85f,2.3f-l3_wallsPassed*0.045f);
+            l3_exShoot+=dt;
+            if(l3_exShoot>=intv){
+                l3_exShoot=0;
+                float dx=l3_playerX-l3_exX, dy=(l3p.y+0.95f)-eY;
+                float dist=sqrtf(dx*dx+dy*dy); if(dist<0.1f)dist=0.1f;
+                float bspd=7.0f+l3_wallsPassed*0.18f;
+                l3_bullets.push_back({l3_exX,eY,dx/dist*bspd,dy/dist*bspd,true});
+            }
+
+            // Peluru
+            for(auto& b:l3_bullets){
+                if(!b.alive) continue;
+                b.x+=b.velX*dt; b.y+=b.velY*dt;
+                if(fabs(b.x)>13||b.y<-2||b.y>50){ b.alive=false; continue; }
+                if(l3_hitCD<=0){
+                    float dx=b.x-l3_playerX, dy=b.y-(l3p.y+0.95f);
+                    if(fabs(dx)<0.45f&&fabs(dy)<1.0f){
+                        b.alive=false; l3_lives--; l3_hitCD=1.8f;
+                        if(l3_lives<=0){ l3_state=GAME_OVER; l3_overlayT=0; }
+                    }
+                }
+            }
+            l3_bullets.erase(std::remove_if(l3_bullets.begin(),l3_bullets.end(),
+                [](const Bullet& b){return !b.alive;}),l3_bullets.end());
+
+        } else { l3_overlayT+=dt; }
+
+        // ── RENDER ──
+        float skyR=0.38f+l3p.standingY*0.018f;
+        float skyG=0.62f+l3p.standingY*0.010f;
+        float skyB=0.88f-l3p.standingY*0.008f;
+        glClearColor(std::min(skyR,0.62f),std::min(skyG,0.80f),std::min(skyB,0.98f),1);
+        glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+        glEnable(GL_DEPTH_TEST);
+
+        float asp=(float)SCR_WIDTH/SCR_HEIGHT;
+        glm::vec3 camP(0,l3_camY,11.0f);
+        glm::vec3 camF(0,-0.15f,-1.0f);
+        glm::mat4 pj=glm::perspective(glm::radians(48.0f),asp,0.1f,100.0f);
+        glm::mat4 vw=glm::lookAt(camP,camP+camF,glm::vec3(0,1,0));
+        sU(sp3,pj,vw);
+        glUniform3fv(glGetUniformLocation(sp3,"lightPos"),1,glm::value_ptr(lightPos));
+        glUniform3fv(glGetUniformLocation(sp3,"lightColor"),1,glm::value_ptr(lightColor));
+
+        float cOY=l3_camY-2.5f;
+        // Langit + matahari
+        dC(sp3,glm::vec3(0,3.5f+cOY,-9),glm::vec3(22,16,0.3f),glm::vec3(0.55f,0.78f,0.98f));
+        dC(sp3,glm::vec3(6.5f,6.8f+cOY,-7),glm::vec3(0.6f,0.6f,0.2f),glm::vec3(1,0.95f,0.35f));
+        // Awan
+        for(auto& c:clouds) dC(sp3,glm::vec3(c.x,c.y+cOY,c.z),glm::vec3(1.3f,0.45f,0.4f),glm::vec3(1,1,1));
+        // Ground — warna ungu-hijau gelap (canopy, beda dari lvl1/lvl2)
+        dC(sp3,glm::vec3(0,-0.3f,0),glm::vec3(15,0.3f,2.5f),glm::vec3(0.16f,0.30f,0.22f));
+        dC(sp3,glm::vec3(0,0.02f,0),glm::vec3(15,0.05f,2.5f),glm::vec3(0.22f,0.46f,0.32f));
+
+        // Bayangan player
+        sU(shp3,pj,vw);
+        float shadowF=L3_GY;
+        for(auto& w:l3_walls)
+            if(w.alive&&!w.waitingDelay&&(w.y+w.height)<=l3p.y+0.02f&&fabs(0.0f-w.x)<PLAYER_HW+w.width)
+                shadowF=std::max(shadowF,w.y+w.height);
+        drawHumanoid(shp3,glm::vec3(0,shadowF,0),0.58f,glm::vec3(0),glm::vec3(0),glm::vec3(0),0,0,true);
+
+        // Tangga — gradient oranye→biru (beda dari lvl1)
+        sU(sp3,pj,vw);
+        for(auto& w:l3_walls){
+            if(!w.alive||w.waitingDelay) continue;
+            float f=(float)(w.id-300)/(float)L3_MAX;
+            glm::vec3 wc=glm::mix(glm::vec3(0.92f,0.55f,0.10f),glm::vec3(0.10f,0.65f,0.90f),f);
+            if(w.isFrozen) wc*=0.82f;
+            dC(sp3,glm::vec3(w.x,w.y,0),glm::vec3(w.width,w.height,0.55f),wc);
+            dC(sp3,glm::vec3(w.x,w.y+w.height,0),glm::vec3(w.width+0.02f,0.02f,0.58f),glm::clamp(wc*1.25f,glm::vec3(0),glm::vec3(1)));
+        }
+
+        // Player — selalu di X=0 (tengah)
+        float eYr3=l3p.standingY+5.5f+sinf(l3_exPhase)*0.4f;
+        float leg=l3p.onGround?sinf(l3p.animTimer*3.0f)*8.0f:-22.0f;
+        float arm=l3p.onGround?sinf(l3p.animTimer*3.0f)*8.0f:-30.0f;
+        glm::vec3 pcol=(l3_hitCD>0&&fmodf(l3_hitCD*6,1)>0.5f)?glm::vec3(1,0.3f,0.3f):glm::vec3(0.20f,0.55f,0.95f);
+        // Leg animation: jalan kalau A/D ditekan
+        bool l3Moving=l3_keysHeld[GLFW_KEY_A]||l3_keysHeld[GLFW_KEY_D]||l3_keysHeld[GLFW_KEY_LEFT]||l3_keysHeld[GLFW_KEY_RIGHT];
+        leg=l3p.onGround?(l3Moving?sinf(l3p.animTimer*3.0f)*8.0f:0.0f):-22.0f;
+        arm=l3p.onGround?(l3Moving?sinf(l3p.animTimer*3.0f)*8.0f:0.0f):-30.0f;
+        drawHumanoid(sp3,glm::vec3(l3_playerX,l3p.y,0),0.58f,pcol,glm::vec3(0.96f,0.80f,0.62f),glm::vec3(0.12f,0.22f,0.60f),leg,arm,false);
+
+        // Enemy merah
+        float pulse=0.82f+0.18f*sinf(now*3.5f);
+        glm::vec3 ec(0.88f,0.12f,0.12f);
+        dC(sp3,glm::vec3(l3_exX,eYr3,0),glm::vec3(0.75f,0.45f,0.38f),ec*pulse);
+        dC(sp3,glm::vec3(l3_exX-1.1f,eYr3+0.1f,0),glm::vec3(0.55f,0.22f,0.2f),ec*0.65f);
+        dC(sp3,glm::vec3(l3_exX+1.1f,eYr3+0.1f,0),glm::vec3(0.55f,0.22f,0.2f),ec*0.65f);
+        dC(sp3,glm::vec3(l3_exX-0.25f,eYr3+0.22f,0.43f),glm::vec3(0.10f,0.10f,0.1f),glm::vec3(1,1,1));
+        dC(sp3,glm::vec3(l3_exX+0.25f,eYr3+0.22f,0.43f),glm::vec3(0.10f,0.10f,0.1f),glm::vec3(1,1,1));
+        dC(sp3,glm::vec3(l3_exX-0.25f,eYr3+0.22f,0.45f),glm::vec3(0.06f,0.06f,0.1f),glm::vec3(0.05f,0.05f,0.05f));
+        dC(sp3,glm::vec3(l3_exX+0.25f,eYr3+0.22f,0.45f),glm::vec3(0.06f,0.06f,0.1f),glm::vec3(0.05f,0.05f,0.05f));
+        // Charge indicator
+        float si3=std::min(l3_exShoot/std::max(0.85f,2.3f-l3_wallsPassed*0.045f),1.0f);
+        dC(sp3,glm::vec3(l3_exX,eYr3-0.62f,0.5f),glm::vec3(0.12f*si3+0.02f,0.12f*si3+0.02f,0.05f),
+           glm::mix(glm::vec3(0.95f,0.8f,0.1f),glm::vec3(0.95f,0.1f,0.1f),si3));
+
+        // Peluru
+        for(auto& b:l3_bullets){
+            if(!b.alive) continue;
+            dC(sp3,glm::vec3(b.x,b.y,0),glm::vec3(0.15f,0.15f,0.15f),glm::vec3(0.98f,0.72f,0.08f));
+            dC(sp3,glm::vec3(b.x-b.velX*0.04f,b.y-b.velY*0.04f,0),glm::vec3(0.10f,0.10f,0.10f),glm::vec3(0.98f,0.45f,0.08f),0.45f);
+        }
+
+        // ── HUD 2D ──
+        {
+            glDisable(GL_DEPTH_TEST);
+            glm::mat4 hp=glm::ortho(0.0f,(float)SCR_WIDTH,(float)SCR_HEIGHT,0.0f,-1.0f,1.0f);
+            glUseProgram(fp3);
+            glUniformMatrix4fv(glGetUniformLocation(fp3,"proj"),1,GL_FALSE,glm::value_ptr(hp));
+            float sc=2.0f,cw=8*sc,ch=8*sc;
+            rR(0,0,(float)SCR_WIDTH,ch+14,0.03f,0.08f,0.04f,0.88f);
+            rR(0,ch+12,(float)SCR_WIDTH,2,0.22f,0.68f,0.30f,0.60f);
+            for(int h=0;h<3;h++) rH(10+h*32,5,sc*0.9f,h<l3_lives);
+            std::string ss="STAIRS: "+std::to_string(l3_wallsPassed)+"/"+std::to_string(L3_MAX);
+            rT(ss,SCR_WIDTH/2.0f-ss.size()*cw/2,5,sc,0.70f,0.98f,0.72f,1);
+            float bW=160,bH=6,bX=SCR_WIDTH-bW-10,bY=ch+2;
+            rR(bX,bY,bW,bH,0.08f,0.18f,0.09f,0.9f);
+            float fill=(float)l3_wallsPassed/(float)L3_MAX;
+            if(fill>0){ float fr=0.95f*(1-fill)+0.20f*fill,fg=0.25f*(1-fill)+0.90f*fill,fb=0.20f*(1-fill)+0.35f*fill;
+                rR(bX,bY,bW*fill,bH,fr,fg,fb,1.0f); }
+            rT("A/D=MOVE ESC=PAUSE",SCR_WIDTH-19*cw,5,sc,0.40f,0.60f,0.42f,0.8f);
+            if(l3_hitCD>0){ float fl=fmodf(l3_hitCD*6,1)>0.5f?0.35f:0.0f;
+                rR(0,0,(float)SCR_WIDTH,(float)SCR_HEIGHT,0.9f,0.1f,0.1f,fl); }
+
+            if(l3_state==PAUSED){
+                float ox=SCR_WIDTH/2.0f,oy=SCR_HEIGHT/2.0f;
+                rR(0,0,(float)SCR_WIDTH,(float)SCR_HEIGHT,0.02f,0.06f,0.03f,0.72f);
+                rR(ox-155,oy-105,310,220,0.04f,0.11f,0.06f,0.97f);
+                rR(ox-155,oy-105,310,3,0.22f,0.72f,0.32f,0.85f); rR(ox-155,oy+112,310,3,0.22f,0.72f,0.32f,0.85f);
+                rR(ox-155,oy-105,3,218,0.22f,0.72f,0.32f,0.85f); rR(ox+152,oy-105,3,218,0.22f,0.72f,0.32f,0.85f);
+                float sc3=3.0f; std::string pt="PAUSED";
+                rT(pt,ox-pt.size()*8*sc3/2,oy-88,sc3,0.32f,0.98f,0.48f,1);
+                rR(ox-90,oy-42,180,2,0.22f,0.65f,0.30f,0.65f);
+                float sc2=1.5f;
+                rT("ESC / P  -  RESUME", ox-18*8*sc2/2,oy-22,sc2,0.72f,0.92f,0.74f,0.95f);
+                rT("R        -  RESTART",ox-19*8*sc2/2,oy+ 5,sc2,0.72f,0.92f,0.74f,0.95f);
+                rT("M        -  MENU",   ox-17*8*sc2/2,oy+32,sc2,0.72f,0.92f,0.74f,0.95f);
+                rR(ox-90,oy+57,180,1,0.18f,0.45f,0.22f,0.5f);
+                std::string di="STAIRS  "+std::to_string(l3_wallsPassed)+"/"+std::to_string(L3_MAX);
+                std::string li="LIVES   "+std::to_string(l3_lives);
+                rT(di,ox-di.size()*8*sc2/2,oy+68,sc2,0.50f,0.72f,0.52f,0.85f);
+                rT(li,ox-li.size()*8*sc2/2,oy+90,sc2,0.50f,0.72f,0.52f,0.85f);
+            }
+            if(l3_state==GAME_OVER){
+                float t=std::min(l3_overlayT*2.0f,1.0f),pul=0.6f+0.4f*sinf(l3_overlayT*4);
+                float ox=SCR_WIDTH/2.0f,oy=SCR_HEIGHT/2.0f;
+                rR(0,0,(float)SCR_WIDTH,(float)SCR_HEIGHT,0.05f,0.01f,0.01f,0.75f*t);
+                float pw=360*t,ph=230*t;
+                rR(ox-pw/2,oy-ph/2,pw,ph,0.10f,0.02f,0.02f,0.97f);
+                float bc=0.80f*pul;
+                rR(ox-pw/2,oy-ph/2,pw,3,bc,0.08f,0.08f,0.9f); rR(ox-pw/2,oy+ph/2-3,pw,3,bc,0.08f,0.08f,0.9f);
+                rR(ox-pw/2,oy-ph/2,3,ph,bc,0.08f,0.08f,0.9f); rR(ox+pw/2-3,oy-ph/2,3,ph,bc,0.08f,0.08f,0.9f);
+                if(t>0.5f){ float ft=(t-0.5f)*2;
+                    float sc3=3.0f; std::string got="GAME  OVER";
+                    rT(got,ox-got.size()*8*sc3/2,oy-90,sc3,0.98f,0.18f,0.18f,ft);
+                    float sc16=1.6f; std::string sub="THE  CANOPY  CLAIMED  YOU";
+                    rT(sub,ox-sub.size()*8*sc16/2,oy-45,sc16,0.75f,0.40f,0.40f,ft*0.85f);
+                    rR(ox-130,oy-28,260,2,0.70f,0.10f,0.10f,0.7f*ft);
+                    float sc2=1.8f; std::string s1="STAIRS: "+std::to_string(l3_wallsPassed)+" / "+std::to_string(L3_MAX);
+                    rT(s1,ox-s1.size()*8*sc2/2,oy-10,sc2,0.88f,0.62f,0.62f,ft);
+                    float dotX=ox-L3_MAX*6.0f;
+                    for(int s2=0;s2<L3_MAX;s2++){ float dc=s2<l3_wallsPassed?1.0f:0.22f;
+                        rR(dotX+s2*12,oy+15,9,9,dc*0.98f,dc*0.82f,0.10f,ft); }
+                    float sc15=1.5f,pa=0.5f+0.5f*sinf(l3_overlayT*3);
+                    rT("PRESS  R  TO  RESTART",ox-21*8*sc15/2,oy+44,sc15,0.95f,0.95f,0.95f,pa*ft);
+                    rT("M  -  BACK  TO  MENU", ox-20*8*sc15/2,oy+68,sc15,0.72f,0.72f,0.72f,ft); }
+            }
+            if(l3_state==WIN){
+                float t=std::min(l3_overlayT*1.8f,1.0f),pul=0.7f+0.3f*sinf(l3_overlayT*3);
+                float ox=SCR_WIDTH/2.0f,oy=SCR_HEIGHT/2.0f;
+                float bcy=sinf(l3_overlayT*4)*5*(1-std::min(l3_overlayT,1.0f));
+                rR(0,0,(float)SCR_WIDTH,(float)SCR_HEIGHT,0.01f,0.06f,0.02f,0.70f*t);
+                float pw=380*t,ph=260*t;
+                rR(ox-pw/2,oy-ph/2+bcy,pw,ph,0.03f,0.12f,0.05f,0.97f);
+                float bc=0.30f*pul;
+                rR(ox-pw/2,oy-ph/2+bcy,pw,3,0.25f,0.88f,0.35f,bc+0.4f);
+                rR(ox-pw/2,oy+ph/2-3+bcy,pw,3,0.25f,0.88f,0.35f,bc+0.4f);
+                rR(ox-pw/2,oy-ph/2+bcy,3,ph,0.25f,0.88f,0.35f,bc+0.4f);
+                rR(ox+pw/2-3,oy-ph/2+bcy,3,ph,0.25f,0.88f,0.35f,bc+0.4f);
+                if(t>0.4f){ float ft=(t-0.4f)/0.6f;
+                    float sc3=3.0f; std::string vt2="VICTORY!";
+                    rT(vt2,ox-vt2.size()*8*sc3/2,oy-100+bcy,sc3,0.30f,0.98f,0.45f,ft);
+                    float sc2=1.6f; std::string vs="CANOPY  RUSH  CLEARED!";
+                    rT(vs,ox-vs.size()*8*sc2/2,oy-52+bcy,sc2,0.65f,0.95f,0.68f,ft);
+                    rR(ox-140,oy-25+bcy,280,2,0.25f,0.80f,0.32f,0.7f*ft);
+                    float sc18=1.8f;
+                    std::string sl="LIVES  REMAINING:  "+std::to_string(l3_lives);
+                    rT(sl,ox-sl.size()*8*sc18/2,oy+5+bcy,sc18,0.55f,0.85f,0.58f,ft);
+                    float dotX=ox-L3_MAX*6.0f;
+                    for(int s2=0;s2<L3_MAX;s2++){ float g2=0.85f+0.15f*sinf(l3_overlayT*5+s2*0.5f);
+                        rR(dotX+s2*12,oy+32+bcy,9,9,g2*0.98f,g2*0.85f,0.10f,ft); }
+                    float sc15=1.5f,pa=0.5f+0.5f*sinf(l3_overlayT*2.5f);
+                    rT("PRESS  R  TO  PLAY  AGAIN",ox-25*8*sc15/2,oy+58+bcy,sc15,0.80f,1.0f,0.82f,pa*ft);
+                    rT("M  -  BACK  TO  MENU",ox-20*8*sc15/2,oy+82+bcy,sc15,0.70f,0.90f,0.72f,ft); }
+            }
+            glEnable(GL_DEPTH_TEST);
+        }
+        glfwSwapBuffers(win); glfwPollEvents();
+    }
+
+    glDeleteVertexArrays(1,&VAO3); glDeleteBuffers(1,&VBO3b);
+    glDeleteVertexArrays(1,&fVAO3); glDeleteBuffers(1,&fVBO3);
+    glDeleteTextures(1,&fTex3); glDeleteTextures(1,&wTex3);
+    glfwTerminate();
+    return l3_backToMenu;
+}
 // WEBVIEW CALLBACKS
 // =============================================
 // Flags global
 static std::atomic<bool> g_openLevelSelect{false};
 static std::atomic<bool> g_startGame{false};
 static std::atomic<bool> g_startLevel2{false};
+static std::atomic<bool> g_startLevel3{false};
 static std::atomic<bool> g_backToMenu{false};
 static std::atomic<bool> g_exit{false};
 
 // Progress flags — persistent selama sesi berjalan
 static bool g_level1Cleared = false;
 static bool g_level2Cleared = false;
+static bool g_level3Cleared = false;
 
 // webview.h lama Windows pakai external_invoke_cb dengan notify()
 void onMenuInvoke(struct webview* w, const char* arg){
@@ -1766,6 +2273,9 @@ void onLevelSelectInvoke(struct webview* w, const char* arg){
         webview_terminate(w);
     } else if(cmd == "startLevel2"){
         g_startLevel2 = true;
+        webview_terminate(w);
+    } else if(cmd == "startLevel3"){
+        g_startLevel3 = true;
         webview_terminate(w);
     } else if(cmd == "backToMenu"){
         g_backToMenu = true;
@@ -1858,10 +2368,11 @@ int main(){
         while(goLevelSelect){
             g_startGame  = false;
             g_startLevel2 = false;
+            g_startLevel3 = false;
             g_backToMenu = false;
 
             // Bangun HTML level select fresh setiap loop agar status unlock terupdate
-            std::string levelHtml    = buildLevelHTML(g_level1Cleared, g_level2Cleared);
+            std::string levelHtml    = buildLevelHTML(g_level1Cleared, g_level2Cleared, g_level3Cleared);
             std::string levelDataUrl = makeDataUrl(levelHtml.c_str());
 
             struct webview lvlwv = {};
@@ -1907,6 +2418,14 @@ int main(){
                 // Cek apakah level 2 berhasil diselesaikan
                 if(l2_state == WIN){
                     g_level2Cleared = true;
+                }
+                goLevelSelect = goMenu;
+                if(!goMenu) running = false;
+            } else if(g_startLevel3){
+                bool goMenu = runGame3();
+                // Cek apakah level 3 berhasil diselesaikan
+                if(l3_state == WIN){
+                    g_level3Cleared = true;
                 }
                 goLevelSelect = goMenu;
                 if(!goMenu) running = false;

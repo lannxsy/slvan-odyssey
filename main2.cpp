@@ -103,7 +103,7 @@ for(var j=0;j<15;j++){var f=document.createElement('div');f.className='firefly';
 // LEVEL_HTML sekarang di-generate secara dinamis lewat fungsi di bawah
 // agar status locked/unlocked bisa diupdate berdasarkan progress pemain.
 
-static std::string buildLevelHTML(bool lvl1cleared, bool lvl2cleared, bool lvl3cleared, bool lvl4cleared=false) {
+static std::string buildLevelHTML(bool lvl1cleared, bool lvl2cleared, bool lvl3cleared, bool lvl4cleared=false, bool lvl5cleared=false) {
     // Helper lambda untuk generate satu kartu level
     auto card = [](int num, const char* name, const char* desc,
                    const char* invoke, bool unlocked, bool cleared) -> std::string {
@@ -192,8 +192,8 @@ body{background:#0a1a0f;font-family:serif;min-height:100vh;overflow:hidden;posit
                  "30 tangga, 2 musuh penembak acak &mdash; langit badai menanti!",
                  "startLevel4", lvl3cleared, lvl4cleared);
     html += card(5, "The Great Ascent",
-                 "Tantangan tertinggi",
-                 "startLevel5", false, false);
+                 "10 tangga lalu BOSS FIGHT &mdash; J untuk menembak balik!",
+                 "startLevel5", lvl4cleared, lvl5cleared);
 
     html += R"(  </div>
   <div class="footer-text">STMIK AMIK Bandung &copy; 2026</div>
@@ -239,7 +239,7 @@ float gameTime     = 0.0f;
 int   score        = 0;
 int   wallsPassed  = 0;
 const int MAX_STAIRS = 10;
-int   playerLives  = 3;    // nyawa pemain
+int   playerLives  = 5;    // nyawa pemain
 float overlayTimer = 0.0f; // animasi overlay game over/win
 float hitCooldown  = 0.0f; // invincibility frames setelah kena hit
 
@@ -691,7 +691,7 @@ void resetGame(){
     wallSpeed         = 5.5f;
     gameTime          = 0.0f;
     gameState         = PLAYING;
-    playerLives       = 3;
+    playerLives       = 5;
     overlayTimer      = 0.0f;
     hitCooldown       = 0.0f;
     spawnFromRight    = false;
@@ -1027,7 +1027,7 @@ bool runGame(){
 
             // ── Hearts / Nyawa ──
             float hx=10, hy=5;
-            for(int h=0;h<3;h++){
+            for(int h=0;h<5;h++){
                 renderHeart(hx + h*32, hy, sc*0.9f, h < playerLives);
             }
 
@@ -1274,7 +1274,7 @@ static float  l2_wallSpeed=5.5f;
 static bool   l2_spawnRight=false;
 static int    l2_wallId=200;
 static int    l2_wallsPassed=0;
-static int    l2_lives=3;
+static int    l2_lives=5;
 static float  l2_hitCD=0,l2_overlayT=0,l2_gameTime=0;
 static GameState l2_state=PLAYING;
 static bool   l2_backToMenu=false;
@@ -1310,7 +1310,7 @@ static void l2_fullReset(){
     l2_walls.clear(); l2_bullets.clear();
     l2_camY=2.5f; l2_camTargetY=2.5f;
     l2_wallSpeed=5.5f; l2_spawnRight=false; l2_wallId=200;
-    l2_wallsPassed=0; l2_lives=3;
+    l2_wallsPassed=0; l2_lives=5;
     l2_hitCD=0; l2_overlayT=0; l2_gameTime=0;
     l2_state=PLAYING; l2_backToMenu=false;
     l2_playerX=0.0f; memset(l2_keysHeld,0,sizeof(l2_keysHeld));
@@ -1649,7 +1649,7 @@ bool runGame2(){
             float sc=2.0f,cw=8*sc,ch=8*sc;
             rR(0,0,(float)SCR_WIDTH,ch+14,0.03f,0.08f,0.04f,0.88f);
             rR(0,ch+12,(float)SCR_WIDTH,2,0.22f,0.68f,0.30f,0.60f);
-            for(int h=0;h<3;h++) rH(10+h*32,5,sc*0.9f,h<l2_lives);
+            for(int h=0;h<5;h++) rH(10+h*32,5,sc*0.9f,h<l2_lives);
             std::string ss="STAIRS: "+std::to_string(l2_wallsPassed)+"/"+std::to_string(L2_MAX);
             rT(ss,SCR_WIDTH/2.0f-ss.size()*cw/2,5,sc,0.70f,0.98f,0.72f,1);
             float bW=160,bH=6,bX=SCR_WIDTH-bW-10,bY=ch+2;
@@ -1781,7 +1781,7 @@ static float  l3_wallSpeed=5.5f;
 static bool   l3_spawnRight=false;
 static int    l3_wallId=300;
 static int    l3_wallsPassed=0;
-static int    l3_lives=3;
+static int    l3_lives=5;
 static float  l3_hitCD=0,l3_overlayT=0,l3_gameTime=0;
 static GameState l3_state=PLAYING;
 static bool   l3_backToMenu=false;
@@ -1817,7 +1817,7 @@ static void l3_fullReset(){
     l3_walls.clear(); l3_bullets.clear();
     l3_camY=2.5f; l3_camTargetY=2.5f;
     l3_wallSpeed=5.5f; l3_spawnRight=false; l3_wallId=300;
-    l3_wallsPassed=0; l3_lives=3;
+    l3_wallsPassed=0; l3_lives=5;
     l3_hitCD=0; l3_overlayT=0; l3_gameTime=0;
     l3_state=PLAYING; l3_backToMenu=false;
     l3_playerX=0.0f; memset(l3_keysHeld,0,sizeof(l3_keysHeld));
@@ -2156,7 +2156,7 @@ bool runGame3(){
             float sc=2.0f,cw=8*sc,ch=8*sc;
             rR(0,0,(float)SCR_WIDTH,ch+14,0.03f,0.08f,0.04f,0.88f);
             rR(0,ch+12,(float)SCR_WIDTH,2,0.22f,0.68f,0.30f,0.60f);
-            for(int h=0;h<3;h++) rH(10+h*32,5,sc*0.9f,h<l3_lives);
+            for(int h=0;h<5;h++) rH(10+h*32,5,sc*0.9f,h<l3_lives);
             std::string ss="STAIRS: "+std::to_string(l3_wallsPassed)+"/"+std::to_string(L3_MAX);
             rT(ss,SCR_WIDTH/2.0f-ss.size()*cw/2,5,sc,0.70f,0.98f,0.72f,1);
             float bW=160,bH=6,bX=SCR_WIDTH-bW-10,bY=ch+2;
@@ -2277,7 +2277,7 @@ static float  l4_wallSpeed=6.0f;
 static bool   l4_spawnRight=false;
 static int    l4_wallId=400;
 static int    l4_wallsPassed=0;
-static int    l4_lives=3;
+static int    l4_lives=5;
 static float  l4_hitCD=0,l4_overlayT=0,l4_gameTime=0;
 static GameState l4_state=PLAYING;
 static bool   l4_backToMenu=false;
@@ -2314,7 +2314,7 @@ static void l4_fullReset(){
     l4_walls.clear(); l4_bullets.clear();
     l4_camY=2.5f; l4_camTargetY=2.5f;
     l4_wallSpeed=6.0f; l4_spawnRight=false; l4_wallId=400;
-    l4_wallsPassed=0; l4_lives=3;
+    l4_wallsPassed=0; l4_lives=5;
     l4_hitCD=0; l4_overlayT=0; l4_gameTime=0;
     l4_state=PLAYING; l4_backToMenu=false;
     l4_playerX=0.0f; memset(l4_keysHeld,0,sizeof(l4_keysHeld));
@@ -2701,7 +2701,7 @@ bool runGame4(){
             float sc=2.0f,cw=8*sc,ch=8*sc;
             rR(0,0,(float)SCR_WIDTH,ch+14,0.05f,0.05f,0.10f,0.88f);
             rR(0,ch+12,(float)SCR_WIDTH,2,0.40f,0.25f,0.70f,0.60f);
-            for(int h=0;h<3;h++) rH(10+h*32,5,sc*0.9f,h<l4_lives);
+            for(int h=0;h<5;h++) rH(10+h*32,5,sc*0.9f,h<l4_lives);
             std::string ss="STAIRS: "+std::to_string(l4_wallsPassed)+"/"+std::to_string(L4_MAX);
             rT(ss,SCR_WIDTH/2.0f-ss.size()*cw/2,5,sc,0.80f,0.70f,0.98f,1);
             float bW=160,bH=6,bX=SCR_WIDTH-bW-10,bY=ch+2;
@@ -2796,6 +2796,596 @@ bool runGame4(){
     return l4_backToMenu;
 }
 
+// =============================================
+// LEVEL 5 - THE GREAT ASCENT (BOSS FIGHT)
+// 10 tangga pembuka -> transisi gelap+petir -> boss fight
+// State sepenuhnya TERPISAH dari Level 1-4.
+// =============================================
+
+enum L5Phase { L5_STAIRS, L5_TRANSITION, L5_BOSSFIGHT };
+
+struct L5Player {
+    float y=0,velY=0,standingY=0,animTimer=0;
+    bool onGround=true;
+} l5p;
+
+struct L5Wall {
+    float x,y,width,height,speedSign,delayTimer;
+    int id;
+    bool passed,alive,isFrozen,waitingDelay;
+};
+
+static std::vector<L5Wall>  l5_walls;
+static std::vector<Bullet>  l5_bullets;     // peluru musuh/boss
+static std::vector<Bullet>  l5_pBullets;    // peluru player (tembak ke atas)
+static float  l5_camY=2.5f, l5_camTargetY=2.5f;
+static float  l5_playerX=0.0f;
+static bool   l5_keysHeld[512]={};
+static float  l5_wallSpeed=6.0f;
+static bool   l5_spawnRight=false;
+static int    l5_wallId=500;
+static int    l5_wallsPassed=0;
+static int    l5_lives=5;
+static float  l5_hitCD=0,l5_overlayT=0,l5_gameTime=0;
+static GameState l5_state=PLAYING;
+static bool   l5_backToMenu=false;
+static L5Phase l5_phase=L5_STAIRS;
+
+// Transisi gelap + petir
+static float l5_transT=0.0f;
+static float l5_flashT=0.0f;
+static int   l5_flashCount=0;
+static std::vector<float> l5_flashSchedule;
+
+// Boss
+static float l5_bossX=0.0f, l5_bossVelX=2.2f;
+static float l5_bossY=6.0f;       // tinggi boss melayang
+static float l5_bossHP=100.0f, l5_bossHPMax=100.0f;
+static float l5_bossShootT=0.0f;
+static float l5_bossHitFlash=0.0f;
+static float l5_bossEnterT=0.0f;  // animasi turun saat fight mulai
+static float l5_shootCD=0.0f;     // cooldown tembak player
+
+const int   L5_STAIRS_MAX=10;
+const float L5_GY=0.0f;
+
+void l5_spawnWall(float delayOverride=-1.0f){
+    int activeCount=0;
+    for(auto& w0:l5_walls) if(w0.alive&&!w0.isFrozen) activeCount++;
+    if(activeCount>4) return;
+    L5Wall w;
+    w.id=l5_wallId++;
+    w.height=0.16f;
+    int stairNum=w.id-500+1;
+    w.width=8.5f-stairNum*0.28f; if(w.width<1.0f)w.width=1.0f;
+    w.y=l5p.standingY+0.75f;
+    w.speedSign=l5_spawnRight?-1.0f:1.0f;
+    l5_spawnRight=!l5_spawnRight;
+    float delay=delayOverride>=0?delayOverride:0.0f;
+    w.waitingDelay=(delay>0);
+    w.delayTimer=delay;
+    w.x=w.waitingDelay?9999.0f:(w.speedSign<0?16.0f:-16.0f);
+    w.passed=false; w.alive=true; w.isFrozen=false;
+    l5_walls.push_back(w);
+}
+
+static void l5_fullReset(){
+    l5p={};
+    l5_walls.clear(); l5_bullets.clear(); l5_pBullets.clear();
+    l5_camY=2.5f; l5_camTargetY=2.5f;
+    l5_wallSpeed=6.0f; l5_spawnRight=false; l5_wallId=500;
+    l5_wallsPassed=0; l5_lives=5;
+    l5_hitCD=0; l5_overlayT=0; l5_gameTime=0;
+    l5_state=PLAYING; l5_backToMenu=false;
+    l5_phase=L5_STAIRS;
+    l5_transT=0; l5_flashT=0; l5_flashCount=0; l5_flashSchedule.clear();
+    l5_bossX=0; l5_bossVelX=2.2f; l5_bossY=6.0f;
+    l5_bossHP=100.0f; l5_bossHPMax=100.0f;
+    l5_bossShootT=0; l5_bossHitFlash=0; l5_bossEnterT=0; l5_shootCD=0;
+    l5_playerX=0.0f; memset(l5_keysHeld,0,sizeof(l5_keysHeld));
+    l5_spawnWall(1.2f);
+}
+
+void l5_key_callback(GLFWwindow* w,int key,int,int action,int){
+    if(key>=0&&key<512){ if(action==GLFW_PRESS) l5_keysHeld[key]=true; if(action==GLFW_RELEASE) l5_keysHeld[key]=false; }
+    if(action==GLFW_PRESS){
+        if((key==GLFW_KEY_SPACE||key==GLFW_KEY_UP||key==GLFW_KEY_W)
+            &&l5p.onGround&&l5_state==PLAYING&&l5_phase==L5_STAIRS){
+            l5p.velY=JUMP_FORCE; l5p.onGround=false;
+        }
+        if(key==GLFW_KEY_J&&l5_state==PLAYING&&l5_phase==L5_BOSSFIGHT&&l5_shootCD<=0){
+            l5_pBullets.push_back({l5_playerX, l5p.y+1.0f, 0.0f, 14.0f, true});
+            l5_shootCD=0.18f;
+        }
+        if((key==GLFW_KEY_ESCAPE||key==GLFW_KEY_P)&&l5_state==PLAYING)  l5_state=PAUSED;
+        else if((key==GLFW_KEY_ESCAPE||key==GLFW_KEY_P)&&l5_state==PAUSED) l5_state=PLAYING;
+        if(key==GLFW_KEY_R&&(l5_state==GAME_OVER||l5_state==WIN||l5_state==PAUSED)) l5_fullReset();
+        if(key==GLFW_KEY_M){ l5_backToMenu=true; glfwSetWindowShouldClose(w,GLFW_TRUE); }
+    }
+}
+
+bool runGame5(){
+    l5_fullReset();
+
+    glfwInit();
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR,3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR,3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE,GLFW_OPENGL_CORE_PROFILE);
+    GLFWwindow* win=glfwCreateWindow(SCR_WIDTH,SCR_HEIGHT,
+        "Sylvan Odyssey - Level 5: The Great Ascent",NULL,NULL);
+#if defined(_WIN32)||defined(_WIN64)
+    { int sw=GetSystemMetrics(SM_CXSCREEN),sh=GetSystemMetrics(SM_CYSCREEN);
+      glfwSetWindowPos(win,(sw-(int)SCR_WIDTH)/2,(sh-(int)SCR_HEIGHT)/2); }
+#else
+    { GLFWmonitor* m=glfwGetPrimaryMonitor(); const GLFWvidmode* v=glfwGetVideoMode(m);
+      if(v) glfwSetWindowPos(win,(v->width-(int)SCR_WIDTH)/2,(v->height-(int)SCR_HEIGHT)/2); }
+#endif
+    glfwMakeContextCurrent(win);
+    glfwSetFramebufferSizeCallback(win,framebuffer_size_callback);
+    glfwSetKeyCallback(win,l5_key_callback);
+    gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
+    glEnable(GL_DEPTH_TEST); glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+
+    unsigned int sp5=makeShader(vertSrc,fragSrc);
+    unsigned int shp5=makeShader(vertSrc,shadowFragSrc);
+    unsigned int fp5=makeShader(fontVertSrc,fontFragSrc);
+
+    // Font textures
+    unsigned int fTex5=0,fVAO5=0,fVBO5=0,wTex5=0;
+    {
+        unsigned char atlas[48][128]={};
+        for(int c=0;c<96;c++){ int col=c%16,row=c/16;
+            for(int y2=0;y2<8;y2++){ unsigned char bits=FONT8[c][y2];
+                for(int x2=0;x2<8;x2++) if(bits&(0x80>>x2)) atlas[row*8+y2][col*8+x2]=255; }}
+        glGenTextures(1,&fTex5); glBindTexture(GL_TEXTURE_2D,fTex5);
+        glTexImage2D(GL_TEXTURE_2D,0,GL_RED,128,48,0,GL_RED,GL_UNSIGNED_BYTE,atlas);
+        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
+        unsigned char w1=255;
+        glGenTextures(1,&wTex5); glBindTexture(GL_TEXTURE_2D,wTex5);
+        glTexImage2D(GL_TEXTURE_2D,0,GL_RED,1,1,0,GL_RED,GL_UNSIGNED_BYTE,&w1);
+        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
+        glGenVertexArrays(1,&fVAO5); glGenBuffers(1,&fVBO5);
+        glBindVertexArray(fVAO5); glBindBuffer(GL_ARRAY_BUFFER,fVBO5);
+        glBufferData(GL_ARRAY_BUFFER,sizeof(float)*6*4,NULL,GL_DYNAMIC_DRAW);
+        glVertexAttribPointer(0,2,GL_FLOAT,GL_FALSE,4*sizeof(float),(void*)0); glEnableVertexAttribArray(0);
+        glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,4*sizeof(float),(void*)(2*sizeof(float))); glEnableVertexAttribArray(1);
+        glBindVertexArray(0);
+    }
+    unsigned int VAO5,VBO5b;
+    glGenVertexArrays(1,&VAO5); glGenBuffers(1,&VBO5b);
+    glBindVertexArray(VAO5); glBindBuffer(GL_ARRAY_BUFFER,VBO5b);
+    glBufferData(GL_ARRAY_BUFFER,sizeof(cubeVerts),cubeVerts,GL_STATIC_DRAW);
+    glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,6*sizeof(float),(void*)0); glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1,3,GL_FLOAT,GL_FALSE,6*sizeof(float),(void*)(3*sizeof(float))); glEnableVertexAttribArray(1);
+
+    auto qd=[&](float x,float y,float w,float h,float u0,float v0,float u1,float v1){
+        float vt[6][4]={{x,y+h,u0,v1},{x,y,u0,v0},{x+w,y,u1,v0},{x,y+h,u0,v1},{x+w,y,u1,v0},{x+w,y+h,u1,v1}};
+        glBindVertexArray(fVAO5); glBindBuffer(GL_ARRAY_BUFFER,fVBO5);
+        glBufferSubData(GL_ARRAY_BUFFER,0,sizeof(vt),vt); glDrawArrays(GL_TRIANGLES,0,6); };
+    auto rR=[&](float x,float y,float w,float h,float r,float g,float b,float a){
+        glUseProgram(fp5); glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D,wTex5);
+        glUniform1i(glGetUniformLocation(fp5,"tex"),0);
+        glUniform4f(glGetUniformLocation(fp5,"color"),r,g,b,a); qd(x,y,w,h,0,0,1,1); };
+    auto rT=[&](const std::string& s,float x,float y,float sc,float r=1,float g=1,float b=1,float a=1){
+        glUseProgram(fp5); glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D,fTex5);
+        glUniform1i(glGetUniformLocation(fp5,"tex"),0);
+        glUniform4f(glGetUniformLocation(fp5,"color"),r,g,b,a);
+        float cx=x;
+        for(char c:s){ if(c<32||c>127)c=32; int idx=c-32,col=idx%16,row=idx/16;
+            float u0=col/16.0f,u1=(col+1)/16.0f,v0=row*8/48.0f,v1=(row+1)*8/48.0f;
+            float vt[6][4]={{cx,y+8*sc,u0,v1},{cx,y,u0,v0},{cx+8*sc,y,u1,v0},
+                            {cx,y+8*sc,u0,v1},{cx+8*sc,y,u1,v0},{cx+8*sc,y+8*sc,u1,v1}};
+            glBindVertexArray(fVAO5); glBindBuffer(GL_ARRAY_BUFFER,fVBO5);
+            glBufferSubData(GL_ARRAY_BUFFER,0,sizeof(vt),vt); glDrawArrays(GL_TRIANGLES,0,6);
+            cx+=8*sc; } };
+    auto rH=[&](float x,float y,float s,bool f){
+        float r=f?0.95f:0.28f,g=f?0.15f:0.22f,b=f?0.18f:0.26f;
+        rR(x+s,y,s,s,r,g,b,1); rR(x+4*s,y,s,s,r,g,b,1);
+        rR(x,y+s,6*s,s,r,g,b,1); rR(x,y+2*s,6*s,s,r,g,b,1);
+        rR(x+s,y+3*s,4*s,s,r,g,b,1); rR(x+2*s,y+4*s,2*s,s,r,g,b,1);
+        rR(x+3*s,y+5*s,s,s,r,g,b,1); };
+    auto sU=[&](unsigned int p,const glm::mat4& pj,const glm::mat4& vw){
+        glUseProgram(p);
+        glUniformMatrix4fv(glGetUniformLocation(p,"projection"),1,GL_FALSE,glm::value_ptr(pj));
+        glUniformMatrix4fv(glGetUniformLocation(p,"view"),1,GL_FALSE,glm::value_ptr(vw)); };
+    auto dC=[&](unsigned int p,glm::vec3 pos,glm::vec3 sc,glm::vec3 col,float a=1.0f){
+        glUseProgram(p);
+        glm::mat4 m=glm::translate(glm::mat4(1),pos)*glm::scale(glm::mat4(1),sc);
+        glUniformMatrix4fv(glGetUniformLocation(p,"model"),1,GL_FALSE,glm::value_ptr(m));
+        glUniform3fv(glGetUniformLocation(p,"objectColor"),1,glm::value_ptr(col));
+        glUniform1f(glGetUniformLocation(p,"alpha"),a);
+        glBindVertexArray(VAO5); glDrawArrays(GL_TRIANGLES,0,36); };
+
+    // Bintang petir/badai latar (dipakai saat fase boss)
+    struct Cld{float x,y,z,spd;};
+    std::vector<Cld> clouds;
+    for(int i=0;i<6;i++) clouds.push_back({-12.0f+i*4.5f,5.2f+i*0.5f,-6.5f,0.55f+i*0.10f});
+
+    static std::mt19937 l5_rng(std::random_device{}());
+    static std::uniform_real_distribution<float> l5_angleDist(3.14159265f,2.0f*3.14159265f);
+    static std::uniform_real_distribution<float> l5_flashGapDist(0.12f,0.45f);
+
+    float lf=(float)glfwGetTime();
+
+    while(!glfwWindowShouldClose(win)){
+        float now=(float)glfwGetTime();
+        float dt=now-lf; if(dt>0.05f)dt=0.05f; lf=now;
+
+        // ── UPDATE ──
+        if(l5_state==PLAYING){
+            l5_gameTime+=dt; l5p.animTimer+=dt;
+            if(l5_hitCD>0) l5_hitCD-=dt;
+            if(l5_shootCD>0) l5_shootCD-=dt;
+
+            if(l5_phase==L5_STAIRS){
+                // A/D movement
+                const float L5_MOVE=7.0f, L5_BOUND=7.5f;
+                if(l5_keysHeld[GLFW_KEY_A]||l5_keysHeld[GLFW_KEY_LEFT])  l5_playerX-=L5_MOVE*dt;
+                if(l5_keysHeld[GLFW_KEY_D]||l5_keysHeld[GLFW_KEY_RIGHT]) l5_playerX+=L5_MOVE*dt;
+                if(l5_playerX< -L5_BOUND) l5_playerX=-L5_BOUND;
+                if(l5_playerX>  L5_BOUND) l5_playerX= L5_BOUND;
+
+                // Fisika player
+                l5p.velY+=GRAVITY*dt;
+                l5p.y+=l5p.velY*dt;
+                bool localOn=false; float curFloor=L5_GY;
+
+                if(l5p.y<=L5_GY){ l5p.y=L5_GY; l5p.velY=0; localOn=true; curFloor=L5_GY; }
+
+                const float LTOL=0.35f,STOL=0.15f;
+                bool doSpawn=false;
+                for(auto& w:l5_walls){
+                    if(!w.alive) continue;
+                    if(w.waitingDelay){
+                        w.delayTimer-=dt;
+                        if(w.delayTimer<=0){ w.waitingDelay=false; w.x=w.speedSign<0?16.0f:-16.0f; }
+                        continue;
+                    }
+                    if(!w.isFrozen) w.x+=w.speedSign*l5_wallSpeed*dt;
+                    if((w.speedSign<0&&w.x<-16)||(w.speedSign>0&&w.x>16)){
+                        if(!w.isFrozen){ w.alive=false; } continue;
+                    }
+                    if(fabs(l5_playerX-w.x)>=PLAYER_HW+w.width) continue;
+                    float pF=l5p.y, pH=l5p.y+PLAYER_H;
+                    float wT=w.y+w.height, wB=w.y-w.height;
+                    if(l5p.velY<=0&&pF>=wT-LTOL&&pF<=wT+0.15f){
+                        if(!w.isFrozen&&!w.passed){
+                            w.isFrozen=true; w.passed=true;
+                            l5_wallsPassed++; doSpawn=true;
+                        }
+                        w.isFrozen=true;
+                        l5p.y=wT; l5p.velY=0;
+                        localOn=true; curFloor=wT;
+                    }
+                    else if(!w.isFrozen&&!w.passed&&l5_hitCD<=0&&pF<wT-STOL&&pH>wB+STOL){
+                        l5_lives--; w.isFrozen=true; w.alive=false; l5_hitCD=1.8f;
+                        if(l5_lives<=0){ l5_state=GAME_OVER; l5_overlayT=0; }
+                        else{ L5Wall rep=w; rep.passed=false; rep.alive=true; rep.isFrozen=false;
+                              rep.waitingDelay=true; rep.delayTimer=1.0f; rep.x=9999;
+                              l5_walls.push_back(rep); }
+                    }
+                }
+                l5_walls.erase(std::remove_if(l5_walls.begin(),l5_walls.end(),
+                    [](const L5Wall& w){return !w.alive&&!w.waitingDelay;}),l5_walls.end());
+
+                l5p.onGround=localOn;
+                if(localOn){ l5p.standingY=curFloor; l5p.y=curFloor; l5p.velY=0; }
+
+                if(l5_wallsPassed>=L5_STAIRS_MAX&&l5p.onGround&&l5_state==PLAYING){
+                    // Tangga selesai -> mulai transisi gelap + petir
+                    l5_phase=L5_TRANSITION;
+                    l5_transT=0; l5_flashT=0; l5_flashCount=0;
+                    l5_flashSchedule.clear();
+                    float t=0.6f;
+                    for(int i=0;i<6;i++){ l5_flashSchedule.push_back(t); t+=l5_flashGapDist(l5_rng); }
+                }
+                if(doSpawn&&l5_state==PLAYING) l5_spawnWall(0.12f);
+
+                l5_wallSpeed=6.0f;
+
+                l5_camTargetY=2.5f+l5p.standingY*0.85f;
+                l5_camY+=(l5_camTargetY-l5_camY)*4.0f*dt;
+            }
+            else if(l5_phase==L5_TRANSITION){
+                l5_transT+=dt;
+                if(l5_flashCount<(int)l5_flashSchedule.size()&&l5_transT>=l5_flashSchedule[l5_flashCount]){
+                    l5_flashT=0.12f; l5_flashCount++;
+                }
+                if(l5_flashT>0) l5_flashT-=dt;
+                if(l5_transT>=l5_flashSchedule.back()+1.4f){
+                    // Mulai boss fight
+                    l5_phase=L5_BOSSFIGHT;
+                    l5_bossEnterT=0;
+                    l5_playerX=0.0f; l5p.y=L5_GY; l5p.standingY=L5_GY; l5p.onGround=true; l5p.velY=0;
+                    l5_camTargetY=2.5f; l5_camY=2.5f;
+                }
+            }
+            else if(l5_phase==L5_BOSSFIGHT){
+                l5_bossEnterT+=dt;
+                float enterK=std::min(l5_bossEnterT/1.6f,1.0f);
+                float bossTargetY=6.0f;
+                float curBossY=10.0f+(bossTargetY-10.0f)*(enterK*enterK*(3-2*enterK)); // smoothstep turun dari atas
+
+                // A/D movement player
+                const float L5_MOVE=7.5f, L5_BOUND=7.0f;
+                if(l5_keysHeld[GLFW_KEY_A]||l5_keysHeld[GLFW_KEY_LEFT])  l5_playerX-=L5_MOVE*dt;
+                if(l5_keysHeld[GLFW_KEY_D]||l5_keysHeld[GLFW_KEY_RIGHT]) l5_playerX+=L5_MOVE*dt;
+                if(l5_playerX< -L5_BOUND) l5_playerX=-L5_BOUND;
+                if(l5_playerX>  L5_BOUND) l5_playerX= L5_BOUND;
+                l5p.y=L5_GY; l5p.standingY=L5_GY; l5p.onGround=true;
+
+                if(enterK>=1.0f){
+                    // Boss gerak kiri-kanan
+                    l5_bossX+=l5_bossVelX*dt;
+                    if(l5_bossX>5.5f){ l5_bossX=5.5f; l5_bossVelX=-fabs(l5_bossVelX); }
+                    if(l5_bossX<-5.5f){ l5_bossX=-5.5f; l5_bossVelX=fabs(l5_bossVelX); }
+
+                    // Boss menembak
+                    float intv=std::max(0.55f,1.6f-(1.0f-l5_bossHP/l5_bossHPMax)*0.9f);
+                    l5_bossShootT+=dt;
+                    if(l5_bossShootT>=intv&&l5_bossHP>0){
+                        l5_bossShootT=0;
+                        float angle=l5_angleDist(l5_rng);
+                        float bspd=7.5f+(1.0f-l5_bossHP/l5_bossHPMax)*3.0f;
+                        l5_bullets.push_back({l5_bossX,curBossY,cosf(angle)*bspd,sinf(angle)*bspd,true});
+                    }
+                }
+                l5_bossY=curBossY;
+
+                // Update peluru boss -> player
+                for(auto& b:l5_bullets){
+                    if(!b.alive) continue;
+                    b.x+=b.velX*dt; b.y+=b.velY*dt;
+                    if(fabs(b.x)>13||b.y<-2||b.y>60){ b.alive=false; continue; }
+                    if(l5_hitCD<=0){
+                        float dx=b.x-l5_playerX, dy=b.y-(l5p.y+0.95f);
+                        if(fabs(dx)<0.45f&&fabs(dy)<1.0f){
+                            b.alive=false; l5_lives--; l5_hitCD=1.8f;
+                            if(l5_lives<=0){ l5_state=GAME_OVER; l5_overlayT=0; }
+                        }
+                    }
+                }
+                l5_bullets.erase(std::remove_if(l5_bullets.begin(),l5_bullets.end(),
+                    [](const Bullet& b){return !b.alive;}),l5_bullets.end());
+
+                // Update peluru player -> boss
+                for(auto& b:l5_pBullets){
+                    if(!b.alive) continue;
+                    b.x+=b.velX*dt; b.y+=b.velY*dt;
+                    if(b.y>60){ b.alive=false; continue; }
+                    if(enterK>=1.0f&&l5_bossHP>0){
+                        float dx=b.x-l5_bossX, dy=b.y-l5_bossY;
+                        if(fabs(dx)<1.1f&&fabs(dy)<1.3f){
+                            b.alive=false; l5_bossHP-=6.0f; l5_bossHitFlash=0.15f;
+                            if(l5_bossHP<=0){ l5_bossHP=0; l5_state=WIN; l5_overlayT=0; }
+                        }
+                    }
+                }
+                l5_pBullets.erase(std::remove_if(l5_pBullets.begin(),l5_pBullets.end(),
+                    [](const Bullet& b){return !b.alive;}),l5_pBullets.end());
+
+                if(l5_bossHitFlash>0) l5_bossHitFlash-=dt;
+
+                for(auto& c:clouds){ c.x-=c.spd*dt; if(c.x<-14)c.x=14; }
+            }
+        } else { l5_overlayT+=dt; }
+
+        // ── RENDER ──
+        bool nightSky = (l5_phase==L5_TRANSITION || l5_phase==L5_BOSSFIGHT);
+        if(!nightSky){
+            float skyR=0.42f+l5p.standingY*0.014f, skyG=0.40f+l5p.standingY*0.008f, skyB=0.62f+l5p.standingY*0.010f;
+            glClearColor(std::min(skyR,0.60f),std::min(skyG,0.55f),std::min(skyB,0.82f),1);
+        } else {
+            // Gelap pekat untuk transisi & boss fight
+            float baseR=0.02f,baseG=0.015f,baseB=0.03f;
+            float flashK = (l5_flashT>0)?std::min(l5_flashT/0.12f,1.0f):0.0f;
+            glClearColor(baseR+flashK*0.55f, baseG+flashK*0.55f, baseB+flashK*0.62f, 1);
+        }
+        glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+        glEnable(GL_DEPTH_TEST);
+
+        glm::mat4 pj=glm::perspective(glm::radians(60.0f),(float)SCR_WIDTH/(float)SCR_HEIGHT,0.1f,100.0f);
+        glm::vec3 camP(0,l5_camY,13.0f);
+        glm::vec3 camF(0,-0.15f,-1.0f);
+        glm::mat4 vw=glm::lookAt(camP,camP+camF,glm::vec3(0,1,0));
+
+        if(l5_phase==L5_STAIRS){
+            sU(sp5,pj,vw);
+            dC(sp5,glm::vec3(0,-0.3f,0),glm::vec3(15,0.3f,2.5f),glm::vec3(0.20f,0.10f,0.26f));
+            dC(sp5,glm::vec3(0,0.02f,0),glm::vec3(15,0.05f,2.5f),glm::vec3(0.30f,0.16f,0.40f));
+
+            // Bayangan player
+            sU(shp5,pj,vw);
+            float shadowF=L5_GY;
+            for(auto& w:l5_walls)
+                if(w.alive&&!w.waitingDelay&&(w.y+w.height)<=l5p.y+0.02f&&fabs(l5_playerX-w.x)<PLAYER_HW+w.width)
+                    shadowF=std::max(shadowF,w.y+w.height);
+            drawHumanoid(shp5,glm::vec3(l5_playerX,shadowF,0),0.58f,glm::vec3(0),glm::vec3(0),glm::vec3(0),0,0,true);
+
+            sU(sp5,pj,vw);
+            for(auto& w:l5_walls){
+                if(!w.alive&&!w.waitingDelay) continue;
+                if(w.waitingDelay) continue;
+                float k=glm::clamp((float)(w.id-500)/(float)L5_STAIRS_MAX,0.0f,1.0f);
+                glm::vec3 col=glm::mix(glm::vec3(0.55f,0.22f,0.70f),glm::vec3(0.30f,0.16f,0.85f),k);
+                dC(sp5,glm::vec3(w.x,w.y,0),glm::vec3(w.width,w.height,0.55f),col);
+            }
+
+            bool moving=l5_keysHeld[GLFW_KEY_A]||l5_keysHeld[GLFW_KEY_D]||l5_keysHeld[GLFW_KEY_LEFT]||l5_keysHeld[GLFW_KEY_RIGHT];
+            float legSw=l5p.onGround?(moving?sinf(l5p.animTimer*9.0f)*32.0f:0.0f):20.0f;
+            float armSw=l5p.onGround?(moving?-sinf(l5p.animTimer*9.0f)*26.0f:0.0f):-18.0f;
+            drawHumanoid(sp5,glm::vec3(l5_playerX,l5p.y,0),0.58f,
+                glm::vec3(0.85f,0.30f,0.20f),glm::vec3(0.92f,0.72f,0.55f),glm::vec3(0.40f,0.18f,0.12f),legSw,armSw);
+        }
+        else { // TRANSITION atau BOSSFIGHT — render arena gelap + boss
+            sU(sp5,pj,vw);
+            // Lantai arena boss
+            dC(sp5,glm::vec3(0,-0.3f,0),glm::vec3(20,0.3f,2.5f),glm::vec3(0.06f,0.03f,0.09f));
+            dC(sp5,glm::vec3(0,0.02f,0),glm::vec3(20,0.05f,2.5f),glm::vec3(0.10f,0.05f,0.14f));
+
+            for(auto& c:clouds) dC(sp5,glm::vec3(c.x,c.y,c.z),glm::vec3(3.6f,0.9f,1.4f),glm::vec3(0.10f,0.08f,0.16f),0.55f);
+
+            bool bossVisible = (l5_phase==L5_BOSSFIGHT) ||
+                (l5_phase==L5_TRANSITION && l5_flashT>0);
+            if(bossVisible){
+                float by=(l5_phase==L5_BOSSFIGHT)?l5_bossY:6.0f;
+                float bx=(l5_phase==L5_BOSSFIGHT)?l5_bossX:0.0f;
+                float hitK=(l5_bossHitFlash>0)?l5_bossHitFlash/0.15f:0.0f;
+                glm::vec3 bodyC=glm::vec3(0.45f+hitK*0.5f,0.08f+hitK*0.3f,0.55f+hitK*0.2f);
+                glm::vec3 hornC=glm::vec3(0.15f,0.04f,0.20f);
+                glm::vec3 eyeC =glm::vec3(0.95f,0.15f,0.10f);
+
+                // Torso besar
+                dC(sp5,glm::vec3(bx,by,0),glm::vec3(2.6f,2.2f,1.6f),bodyC);
+                // Bahu kiri-kanan
+                dC(sp5,glm::vec3(bx-1.5f,by+0.4f,0),glm::vec3(1.1f,0.9f,1.3f),bodyC);
+                dC(sp5,glm::vec3(bx+1.5f,by+0.4f,0),glm::vec3(1.1f,0.9f,1.3f),bodyC);
+                // Kepala
+                dC(sp5,glm::vec3(bx,by+1.7f,0.1f),glm::vec3(1.3f,1.1f,1.1f),bodyC);
+                // Tanduk
+                dC(sp5,glm::vec3(bx-0.5f,by+2.5f,0.0f),glm::vec3(0.22f,0.7f,0.22f),hornC);
+                dC(sp5,glm::vec3(bx+0.5f,by+2.5f,0.0f),glm::vec3(0.22f,0.7f,0.22f),hornC);
+                // Mata menyala
+                dC(sp5,glm::vec3(bx-0.32f,by+1.75f,0.62f),glm::vec3(0.22f,0.16f,0.10f),eyeC);
+                dC(sp5,glm::vec3(bx+0.32f,by+1.75f,0.62f),glm::vec3(0.22f,0.16f,0.10f),eyeC);
+            }
+
+            if(l5_phase==L5_BOSSFIGHT){
+                bool moving=l5_keysHeld[GLFW_KEY_A]||l5_keysHeld[GLFW_KEY_D]||l5_keysHeld[GLFW_KEY_LEFT]||l5_keysHeld[GLFW_KEY_RIGHT];
+                float legSw=moving?sinf(l5p.animTimer*9.0f)*32.0f:0.0f;
+                float armSw=moving?-sinf(l5p.animTimer*9.0f)*26.0f:0.0f;
+                drawHumanoid(sp5,glm::vec3(l5_playerX,l5p.y,0),0.58f,
+                    glm::vec3(0.85f,0.30f,0.20f),glm::vec3(0.92f,0.72f,0.55f),glm::vec3(0.40f,0.18f,0.12f),legSw,armSw);
+
+                // Peluru boss
+                for(auto& b:l5_bullets){
+                    if(!b.alive) continue;
+                    dC(sp5,glm::vec3(b.x,b.y,0),glm::vec3(0.20f,0.20f,0.20f),glm::vec3(0.85f,0.15f,0.55f));
+                }
+                // Peluru player
+                for(auto& b:l5_pBullets){
+                    if(!b.alive) continue;
+                    dC(sp5,glm::vec3(b.x,b.y,0),glm::vec3(0.14f,0.32f,0.14f),glm::vec3(0.35f,0.95f,0.60f));
+                }
+            }
+        }
+
+        // ── HUD 2D ──
+        {
+            glDisable(GL_DEPTH_TEST);
+            glm::mat4 hp=glm::ortho(0.0f,(float)SCR_WIDTH,(float)SCR_HEIGHT,0.0f,-1.0f,1.0f);
+            glUseProgram(fp5);
+            glUniformMatrix4fv(glGetUniformLocation(fp5,"proj"),1,GL_FALSE,glm::value_ptr(hp));
+            float sc=2.0f,cw=8*sc,ch=8*sc;
+            rR(0,0,(float)SCR_WIDTH,ch+14,0.05f,0.03f,0.08f,0.88f);
+            rR(0,ch+12,(float)SCR_WIDTH,2,0.55f,0.15f,0.65f,0.60f);
+            for(int h=0;h<5;h++) rH(10+h*32,5,sc*0.9f,h<l5_lives);
+
+            if(l5_phase==L5_STAIRS){
+                std::string ss="STAIRS: "+std::to_string(l5_wallsPassed)+"/"+std::to_string(L5_STAIRS_MAX);
+                rT(ss,SCR_WIDTH/2.0f-ss.size()*cw/2,5,sc,0.85f,0.65f,0.95f,1);
+                float bW=160,bH=6,bX=SCR_WIDTH-bW-10,bY=ch+2;
+                rR(bX,bY,bW,bH,0.10f,0.06f,0.16f,0.9f);
+                float fill=(float)l5_wallsPassed/(float)L5_STAIRS_MAX;
+                if(fill>0) rR(bX,bY,bW*fill,bH,0.55f,0.18f,0.70f,1.0f);
+                rT("A/D=MOVE J=SHOOT ESC=PAUSE",SCR_WIDTH-27*cw*0.62f,5,sc*0.62f,0.55f,0.45f,0.70f,0.8f);
+            } else if(l5_phase==L5_BOSSFIGHT){
+                std::string ss="THE  GREAT  ASCENT";
+                rT(ss,SCR_WIDTH/2.0f-ss.size()*cw*0.6f/2,5,sc*0.6f,0.85f,0.55f,0.95f,1);
+                // Boss HP bar
+                float bW=320,bH=14,bX=SCR_WIDTH/2.0f-bW/2,bY=ch+18;
+                rR(bX-2,bY-2,bW+4,bH+4,0.30f,0.05f,0.30f,0.9f);
+                rR(bX,bY,bW,bH,0.10f,0.02f,0.10f,0.95f);
+                float hf=l5_bossHP/l5_bossHPMax;
+                if(hf>0) rR(bX,bY,bW*hf,bH,0.85f*(1-hf)+0.40f*hf,0.10f,0.55f*hf+0.15f,1.0f);
+                rT("BOSS",bX,bY-16,sc*0.7f,0.85f,0.45f,0.85f,0.9f);
+            }
+            if(l5_hitCD>0){ float fl=fmodf(l5_hitCD*6,1)>0.5f?0.35f:0.0f;
+                rR(0,0,(float)SCR_WIDTH,(float)SCR_HEIGHT,0.9f,0.1f,0.1f,fl); }
+
+            if(l5_phase==L5_TRANSITION&&l5_flashT>0){
+                float fa=std::min(l5_flashT/0.12f,1.0f);
+                rR(0,0,(float)SCR_WIDTH,(float)SCR_HEIGHT,0.85f,0.85f,0.95f,fa*0.55f);
+            }
+
+            if(l5_state==PAUSED){
+                float ox=SCR_WIDTH/2.0f,oy=SCR_HEIGHT/2.0f;
+                rR(0,0,(float)SCR_WIDTH,(float)SCR_HEIGHT,0.02f,0.02f,0.08f,0.72f);
+                rR(ox-155,oy-105,310,220,0.05f,0.05f,0.12f,0.97f);
+                rR(ox-155,oy-105,310,3,0.55f,0.18f,0.70f,0.85f); rR(ox-155,oy+112,310,3,0.55f,0.18f,0.70f,0.85f);
+                rR(ox-155,oy-105,3,218,0.55f,0.18f,0.70f,0.85f); rR(ox+152,oy-105,3,218,0.55f,0.18f,0.70f,0.85f);
+                float sc3=3.0f; std::string pt="PAUSED";
+                rT(pt,ox-pt.size()*8*sc3/2,oy-88,sc3,0.85f,0.50f,0.95f,1);
+                rR(ox-90,oy-42,180,2,0.40f,0.15f,0.55f,0.65f);
+                float sc2=1.5f;
+                rT("ESC / P  -  RESUME", ox-18*8*sc2/2,oy-22,sc2,0.85f,0.72f,0.95f,0.95f);
+                rT("R        -  RESTART",ox-19*8*sc2/2,oy+ 5,sc2,0.85f,0.72f,0.95f,0.95f);
+                rT("M        -  MENU",   ox-17*8*sc2/2,oy+32,sc2,0.85f,0.72f,0.95f,0.95f);
+                rR(ox-90,oy+57,180,1,0.35f,0.12f,0.50f,0.5f);
+                std::string li="LIVES   "+std::to_string(l5_lives);
+                rT(li,ox-li.size()*8*sc2/2,oy+68,sc2,0.65f,0.45f,0.80f,0.85f);
+            }
+            if(l5_state==GAME_OVER){
+                float t=std::min(l5_overlayT*2.0f,1.0f),pul=0.6f+0.4f*sinf(l5_overlayT*4);
+                float ox=SCR_WIDTH/2.0f,oy=SCR_HEIGHT/2.0f;
+                rR(0,0,(float)SCR_WIDTH,(float)SCR_HEIGHT,0.05f,0.01f,0.01f,0.75f*t);
+                float pw=360*t,ph=230*t;
+                rR(ox-pw/2,oy-ph/2,pw,ph,0.08f,0.02f,0.05f,0.97f);
+                float bc=0.80f*pul;
+                rR(ox-pw/2,oy-ph/2,pw,3,bc,0.08f,0.20f,0.9f); rR(ox-pw/2,oy+ph/2-3,pw,3,bc,0.08f,0.20f,0.9f);
+                rR(ox-pw/2,oy-ph/2,3,ph,bc,0.08f,0.20f,0.9f); rR(ox+pw/2-3,oy-ph/2,3,ph,bc,0.08f,0.20f,0.9f);
+                if(t>0.5f){ float ft=(t-0.5f)*2;
+                    float sc3=3.0f; std::string got="GAME  OVER";
+                    rT(got,ox-got.size()*8*sc3/2,oy-90,sc3,0.98f,0.18f,0.35f,ft);
+                    float sc16=1.6f; std::string sub="THE  BOSS  OVERWHELMED  YOU";
+                    rT(sub,ox-sub.size()*8*sc16/2,oy-45,sc16,0.75f,0.35f,0.55f,ft*0.85f);
+                    rR(ox-130,oy-28,260,2,0.70f,0.10f,0.30f,0.7f*ft);
+                    float sc15=1.5f,pa=0.5f+0.5f*sinf(l5_overlayT*3);
+                    rT("PRESS  R  TO  RESTART",ox-21*8*sc15/2,oy+15,sc15,0.95f,0.95f,0.95f,pa*ft);
+                    rT("M  -  BACK  TO  MENU", ox-20*8*sc15/2,oy+40,sc15,0.72f,0.72f,0.72f,ft); }
+            }
+            if(l5_state==WIN){
+                float t=std::min(l5_overlayT*1.8f,1.0f),pul=0.7f+0.3f*sinf(l5_overlayT*3);
+                float ox=SCR_WIDTH/2.0f,oy=SCR_HEIGHT/2.0f;
+                float bcy=sinf(l5_overlayT*4)*5*(1-std::min(l5_overlayT,1.0f));
+                rR(0,0,(float)SCR_WIDTH,(float)SCR_HEIGHT,0.02f,0.02f,0.08f,0.70f*t);
+                float pw=380*t,ph=260*t;
+                rR(ox-pw/2,oy-ph/2+bcy,pw,ph,0.05f,0.04f,0.12f,0.97f);
+                float bc=0.30f*pul;
+                rR(ox-pw/2,oy-ph/2+bcy,pw,3,0.65f,0.25f,0.88f,bc+0.4f);
+                rR(ox-pw/2,oy+ph/2-3+bcy,pw,3,0.65f,0.25f,0.88f,bc+0.4f);
+                rR(ox-pw/2,oy-ph/2+bcy,3,ph,0.65f,0.25f,0.88f,bc+0.4f);
+                rR(ox+pw/2-3,oy-ph/2+bcy,3,ph,0.65f,0.25f,0.88f,bc+0.4f);
+                if(t>0.4f){ float ft=(t-0.4f)/0.6f;
+                    float sc3=3.0f; std::string vt2="VICTORY!";
+                    rT(vt2,ox-vt2.size()*8*sc3/2,oy-100+bcy,sc3,0.75f,0.40f,0.98f,ft);
+                    float sc2=1.6f; std::string vs="THE  BOSS  HAS  FALLEN!";
+                    rT(vs,ox-vs.size()*8*sc2/2,oy-52+bcy,sc2,0.80f,0.60f,0.95f,ft);
+                    rR(ox-140,oy-25+bcy,280,2,0.50f,0.25f,0.80f,0.7f*ft);
+                    float sc18=1.8f;
+                    std::string sl="LIVES  REMAINING:  "+std::to_string(l5_lives);
+                    rT(sl,ox-sl.size()*8*sc18/2,oy+5+bcy,sc18,0.70f,0.50f,0.88f,ft);
+                    float sc15=1.5f,pa=0.5f+0.5f*sinf(l5_overlayT*2.5f);
+                    rT("PRESS  R  TO  PLAY  AGAIN",ox-25*8*sc15/2,oy+40+bcy,sc15,0.85f,0.70f,1.0f,pa*ft);
+                    rT("M  -  BACK  TO  MENU",ox-20*8*sc15/2,oy+64+bcy,sc15,0.75f,0.60f,0.90f,ft); }
+            }
+            glEnable(GL_DEPTH_TEST);
+        }
+        glfwSwapBuffers(win); glfwPollEvents();
+    }
+
+    glDeleteVertexArrays(1,&VAO5); glDeleteBuffers(1,&VBO5b);
+    glDeleteVertexArrays(1,&fVAO5); glDeleteBuffers(1,&fVBO5);
+    glDeleteTextures(1,&fTex5); glDeleteTextures(1,&wTex5);
+    glfwTerminate();
+    return l5_backToMenu;
+}
+
 // WEBVIEW CALLBACKS
 // =============================================
 // Flags global
@@ -2804,6 +3394,7 @@ static std::atomic<bool> g_startGame{false};
 static std::atomic<bool> g_startLevel2{false};
 static std::atomic<bool> g_startLevel3{false};
 static std::atomic<bool> g_startLevel4{false};
+static std::atomic<bool> g_startLevel5{false};
 static std::atomic<bool> g_backToMenu{false};
 static std::atomic<bool> g_exit{false};
 
@@ -2812,6 +3403,7 @@ static bool g_level1Cleared = true;
 static bool g_level2Cleared = true;
 static bool g_level3Cleared = true;
 static bool g_level4Cleared = true;
+static bool g_level5Cleared = true;
 
 // webview.h lama Windows pakai external_invoke_cb dengan notify()
 void onMenuInvoke(struct webview* w, const char* arg){
@@ -2836,6 +3428,9 @@ void onLevelSelectInvoke(struct webview* w, const char* arg){
         webview_terminate(w);
     } else if(cmd == "startLevel4"){
         g_startLevel4 = true;
+        webview_terminate(w);
+    } else if(cmd == "startLevel5"){
+        g_startLevel5 = true;
         webview_terminate(w);
     } else if(cmd == "backToMenu"){
         g_backToMenu = true;
@@ -2930,10 +3525,11 @@ int main(){
             g_startLevel2 = false;
             g_startLevel3 = false;
             g_startLevel4 = false;
+            g_startLevel5 = false;
             g_backToMenu = false;
 
             // Bangun HTML level select fresh setiap loop agar status unlock terupdate
-            std::string levelHtml    = buildLevelHTML(g_level1Cleared, g_level2Cleared, g_level3Cleared, g_level4Cleared);
+            std::string levelHtml    = buildLevelHTML(g_level1Cleared, g_level2Cleared, g_level3Cleared, g_level4Cleared, g_level5Cleared);
             std::string levelDataUrl = makeDataUrl(levelHtml.c_str());
 
             struct webview lvlwv = {};
@@ -2994,6 +3590,13 @@ int main(){
                 bool goMenu = runGame4();
                 if(l4_state == WIN){
                     g_level4Cleared = true;
+                }
+                goLevelSelect = goMenu;
+                if(!goMenu) running = false;
+            } else if(g_startLevel5){
+                bool goMenu = runGame5();
+                if(l5_state == WIN){
+                    g_level5Cleared = true;
                 }
                 goLevelSelect = goMenu;
                 if(!goMenu) running = false;

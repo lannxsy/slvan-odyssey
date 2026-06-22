@@ -2837,6 +2837,10 @@ static float l5_flashT=0.0f;
 static int   l5_flashCount=0;
 static std::vector<float> l5_flashSchedule;
 
+// Petir ambience saat boss fight (langit tetap terlihat, cuma sesekali nyambar)
+static float l5_ambFlashT=0.0f;   // durasi flash aktif saat ini
+static float l5_ambFlashCD=1.0f;  // countdown sampai flash berikutnya
+
 // Boss
 static float l5_bossX=0.0f, l5_bossVelX=2.2f;
 static float l5_bossY=6.0f;       // tinggi boss melayang
@@ -2879,6 +2883,7 @@ static void l5_fullReset(){
     l5_state=PLAYING; l5_backToMenu=false;
     l5_phase=L5_STAIRS;
     l5_transT=0; l5_flashT=0; l5_flashCount=0; l5_flashSchedule.clear();
+    l5_ambFlashT=0; l5_ambFlashCD=2.0f;
     l5_bossX=0; l5_bossVelX=2.2f; l5_bossY=6.0f;
     l5_bossHP=100.0f; l5_bossHPMax=100.0f;
     l5_bossShootT=0; l5_bossHitFlash=0; l5_bossEnterT=0; l5_shootCD=0;
@@ -3111,6 +3116,13 @@ bool runGame5(){
                 float bossTargetY=6.0f;
                 float curBossY=10.0f+(bossTargetY-10.0f)*(enterK*enterK*(3-2*enterK)); // smoothstep turun dari atas
 
+                // Petir ambience — sesekali nyambar selama fight, tema dramatis (bukan bikin gelap)
+                if(l5_ambFlashT>0) l5_ambFlashT-=dt;
+                else{
+                    l5_ambFlashCD-=dt;
+                    if(l5_ambFlashCD<=0){ l5_ambFlashT=0.10f; l5_ambFlashCD=l5_flashGapDist(l5_rng)*3.0f+1.2f; }
+                }
+
                 // A/D movement player
                 const float L5_MOVE=7.5f, L5_BOUND=7.0f;
                 if(l5_keysHeld[GLFW_KEY_A]||l5_keysHeld[GLFW_KEY_LEFT])  l5_playerX-=L5_MOVE*dt;
@@ -3176,15 +3188,18 @@ bool runGame5(){
         } else { l5_overlayT+=dt; }
 
         // ── RENDER ──
-        bool nightSky = (l5_phase==L5_TRANSITION || l5_phase==L5_BOSSFIGHT);
-        if(!nightSky){
+        if(l5_phase==L5_STAIRS){
             float skyR=0.42f+l5p.standingY*0.014f, skyG=0.40f+l5p.standingY*0.008f, skyB=0.62f+l5p.standingY*0.010f;
             glClearColor(std::min(skyR,0.60f),std::min(skyG,0.55f),std::min(skyB,0.82f),1);
-        } else {
-            // Gelap pekat untuk transisi & boss fight
+        } else if(l5_phase==L5_TRANSITION){
+            // Gelap pekat untuk transisi dramatis tangga 10 -> boss
             float baseR=0.02f,baseG=0.015f,baseB=0.03f;
             float flashK = (l5_flashT>0)?std::min(l5_flashT/0.12f,1.0f):0.0f;
             glClearColor(baseR+flashK*0.55f, baseG+flashK*0.55f, baseB+flashK*0.62f, 1);
+        } else { // L5_BOSSFIGHT — langit badai gelap tapi tetap terlihat (mirip lvl4) + kilat ambience
+            float baseR=0.12f,baseG=0.13f,baseB=0.22f;
+            float flashK = (l5_ambFlashT>0)?std::min(l5_ambFlashT/0.10f,1.0f):0.0f;
+            glClearColor(std::min(baseR+flashK*0.5f,0.62f), std::min(baseG+flashK*0.5f,0.62f), std::min(baseB+flashK*0.55f,0.72f), 1);
         }
         glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
         glEnable(GL_DEPTH_TEST);
@@ -3225,10 +3240,10 @@ bool runGame5(){
         else { // TRANSITION atau BOSSFIGHT — render arena gelap + boss
             sU(sp5,pj,vw);
             // Lantai arena boss
-            dC(sp5,glm::vec3(0,-0.3f,0),glm::vec3(20,0.3f,2.5f),glm::vec3(0.06f,0.03f,0.09f));
-            dC(sp5,glm::vec3(0,0.02f,0),glm::vec3(20,0.05f,2.5f),glm::vec3(0.10f,0.05f,0.14f));
+            dC(sp5,glm::vec3(0,-0.3f,0),glm::vec3(20,0.3f,2.5f),glm::vec3(0.14f,0.08f,0.18f));
+            dC(sp5,glm::vec3(0,0.02f,0),glm::vec3(20,0.05f,2.5f),glm::vec3(0.20f,0.12f,0.26f));
 
-            for(auto& c:clouds) dC(sp5,glm::vec3(c.x,c.y,c.z),glm::vec3(3.6f,0.9f,1.4f),glm::vec3(0.10f,0.08f,0.16f),0.55f);
+            for(auto& c:clouds) dC(sp5,glm::vec3(c.x,c.y,c.z),glm::vec3(3.6f,0.9f,1.4f),glm::vec3(0.18f,0.15f,0.26f),0.55f);
 
             bool bossVisible = (l5_phase==L5_BOSSFIGHT) ||
                 (l5_phase==L5_TRANSITION && l5_flashT>0);
@@ -3311,6 +3326,10 @@ bool runGame5(){
             if(l5_phase==L5_TRANSITION&&l5_flashT>0){
                 float fa=std::min(l5_flashT/0.12f,1.0f);
                 rR(0,0,(float)SCR_WIDTH,(float)SCR_HEIGHT,0.85f,0.85f,0.95f,fa*0.55f);
+            }
+            if(l5_phase==L5_BOSSFIGHT&&l5_ambFlashT>0){
+                float fa=std::min(l5_ambFlashT/0.10f,1.0f);
+                rR(0,0,(float)SCR_WIDTH,(float)SCR_HEIGHT,0.80f,0.80f,0.92f,fa*0.35f);
             }
 
             if(l5_state==PAUSED){

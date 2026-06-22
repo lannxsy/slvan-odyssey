@@ -2777,10 +2777,10 @@ static std::atomic<bool> g_backToMenu{false};
 static std::atomic<bool> g_exit{false};
 
 // Progress flags — persistent selama sesi berjalan
-static bool g_level1Cleared = false;
-static bool g_level2Cleared = false;
-static bool g_level3Cleared = false;
-static bool g_level4Cleared = false;
+static bool g_level1Cleared = true;
+static bool g_level2Cleared = true;
+static bool g_level3Cleared = true;
+static bool g_level4Cleared = true;
 
 // webview.h lama Windows pakai external_invoke_cb dengan notify()
 void onMenuInvoke(struct webview* w, const char* arg){

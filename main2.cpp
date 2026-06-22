@@ -621,8 +621,12 @@ void drawHumanoid(unsigned int prog, glm::vec3 base, float s, glm::vec3 bodyC, g
     }
     // HEAD & EYES
     drawCube(prog, base+glm::vec3(0,s*1.52f,0), glm::vec3(s*0.33f,s*0.30f,s*0.26f), headC);
-    drawCube(prog, base+glm::vec3(-s*0.14f,s*1.58f,s*0.27f), glm::vec3(s*0.06f,s*0.06f,0.02f), glm::vec3(0.1f,0.1f,0.1f));
-    drawCube(prog, base+glm::vec3( s*0.14f,s*1.58f,s*0.27f), glm::vec3(s*0.06f,s*0.06f,0.02f), glm::vec3(0.1f,0.1f,0.1f));
+    // Eye whites — Z menonjol keluar dari kepala (s*0.26 = half, jadi s*0.28+ = depan)
+    drawCube(prog, base+glm::vec3(-s*0.13f,s*1.59f,s*0.30f), glm::vec3(s*0.07f,s*0.07f,s*0.04f), glm::vec3(0.95f,0.95f,0.95f));
+    drawCube(prog, base+glm::vec3( s*0.13f,s*1.59f,s*0.30f), glm::vec3(s*0.07f,s*0.07f,s*0.04f), glm::vec3(0.95f,0.95f,0.95f));
+    // Pupils
+    drawCube(prog, base+glm::vec3(-s*0.13f,s*1.59f,s*0.35f), glm::vec3(s*0.04f,s*0.04f,s*0.03f), glm::vec3(0.05f,0.05f,0.05f));
+    drawCube(prog, base+glm::vec3( s*0.13f,s*1.59f,s*0.35f), glm::vec3(s*0.04f,s*0.04f,s*0.03f), glm::vec3(0.05f,0.05f,0.05f));
 }
 
 // =============================================
@@ -1531,9 +1535,9 @@ bool runGame2(){
             l2_exShoot+=dt;
             if(l2_exShoot>=intv){
                 l2_exShoot=0;
-                // Arah acak (random) — bukan langsung ke player
+                // Arah acak (random) — bukan langsung ke player, tapi tetap ke bawah (enemy di atas player)
                 static std::mt19937 l2_rng(std::random_device{}());
-                static std::uniform_real_distribution<float> l2_angleDist(0.0f, 2.0f*3.14159265f);
+                static std::uniform_real_distribution<float> l2_angleDist(3.14159265f, 2.0f*3.14159265f);
                 float angle = l2_angleDist(l2_rng);
                 float bspd=7.0f+l2_wallsPassed*0.18f;
                 l2_bullets.push_back({l2_exX,eY,cosf(angle)*bspd,sinf(angle)*bspd,true});
@@ -1588,9 +1592,9 @@ bool runGame2(){
         sU(shp2,pj,vw);
         float shadowF=L2_GY;
         for(auto& w:l2_walls)
-            if(w.alive&&!w.waitingDelay&&(w.y+w.height)<=l2p.y+0.02f&&fabs(0.0f-w.x)<PLAYER_HW+w.width)
+            if(w.alive&&!w.waitingDelay&&(w.y+w.height)<=l2p.y+0.02f&&fabs(l2_playerX-w.x)<PLAYER_HW+w.width)
                 shadowF=std::max(shadowF,w.y+w.height);
-        drawHumanoid(shp2,glm::vec3(0,shadowF,0),0.58f,glm::vec3(0),glm::vec3(0),glm::vec3(0),0,0,true);
+        drawHumanoid(shp2,glm::vec3(l2_playerX,shadowF,0),0.58f,glm::vec3(0),glm::vec3(0),glm::vec3(0),0,0,true);
 
         // Tangga — gradient oranye→biru (beda dari lvl1)
         sU(sp2,pj,vw);
@@ -2038,9 +2042,9 @@ bool runGame3(){
             l3_exShoot+=dt;
             if(l3_exShoot>=intv){
                 l3_exShoot=0;
-                // Arah acak (random) — bukan langsung ke player
+                // Arah acak (random) — bukan langsung ke player, tapi tetap ke bawah (enemy di atas player)
                 static std::mt19937 l3_rng(std::random_device{}());
-                static std::uniform_real_distribution<float> l3_angleDist(0.0f, 2.0f*3.14159265f);
+                static std::uniform_real_distribution<float> l3_angleDist(3.14159265f, 2.0f*3.14159265f);
                 float angle = l3_angleDist(l3_rng);
                 float bspd=7.0f+l3_wallsPassed*0.18f;
                 l3_bullets.push_back({l3_exX,eY,cosf(angle)*bspd,sinf(angle)*bspd,true});
@@ -2095,9 +2099,9 @@ bool runGame3(){
         sU(shp3,pj,vw);
         float shadowF=L3_GY;
         for(auto& w:l3_walls)
-            if(w.alive&&!w.waitingDelay&&(w.y+w.height)<=l3p.y+0.02f&&fabs(0.0f-w.x)<PLAYER_HW+w.width)
+            if(w.alive&&!w.waitingDelay&&(w.y+w.height)<=l3p.y+0.02f&&fabs(l3_playerX-w.x)<PLAYER_HW+w.width)
                 shadowF=std::max(shadowF,w.y+w.height);
-        drawHumanoid(shp3,glm::vec3(0,shadowF,0),0.58f,glm::vec3(0),glm::vec3(0),glm::vec3(0),0,0,true);
+        drawHumanoid(shp3,glm::vec3(l3_playerX,shadowF,0),0.58f,glm::vec3(0),glm::vec3(0),glm::vec3(0),0,0,true);
 
         // Tangga — gradient oranye→biru (beda dari lvl1)
         sU(sp3,pj,vw);
@@ -2435,9 +2439,9 @@ bool runGame4(){
     std::vector<Cld> clouds;
     for(int i=0;i<6;i++) clouds.push_back({-12.0f+i*4.5f,5.2f+i*0.5f,-6.5f,0.55f+i*0.10f});
 
-    // RNG untuk kedua musuh
+    // RNG untuk kedua musuh — arah acak tapi tetap ke bawah (enemy di atas player)
     static std::mt19937 l4_rng(std::random_device{}());
-    static std::uniform_real_distribution<float> l4_angleDist(0.0f,2.0f*3.14159265f);
+    static std::uniform_real_distribution<float> l4_angleDist(3.14159265f,2.0f*3.14159265f);
 
     float lf=(float)glfwGetTime();
 
@@ -2584,6 +2588,9 @@ bool runGame4(){
         glUniform3fv(glGetUniformLocation(sp4,"lightColor"),1,glm::value_ptr(lightColor));
 
         float cOY=l4_camY-2.5f;
+        // Posisi Y enemy (dihitung lebih awal supaya bisa dipakai untuk bayangan)
+        float e1Yr=l4p.standingY+4.5f+sinf(l4_ex1Phase)*0.5f;
+        float e2Yr=l4p.standingY+6.5f+sinf(l4_ex2Phase)*0.6f;
         // Langit badai + kilat
         dC(sp4,glm::vec3(0,3.5f+cOY,-9),glm::vec3(22,16,0.3f),glm::vec3(0.15f,0.17f,0.28f));
         float lightning=sinf(now*7.3f); if(lightning>0.92f) // kilat sesekali
@@ -2598,9 +2605,33 @@ bool runGame4(){
         sU(shp4,pj,vw);
         float shadowF=L4_GY;
         for(auto& w:l4_walls)
-            if(w.alive&&!w.waitingDelay&&(w.y+w.height)<=l4p.y+0.02f&&fabs(0.0f-w.x)<PLAYER_HW+w.width)
+            if(w.alive&&!w.waitingDelay&&(w.y+w.height)<=l4p.y+0.02f&&fabs(l4_playerX-w.x)<PLAYER_HW+w.width)
                 shadowF=std::max(shadowF,w.y+w.height);
-        drawHumanoid(shp4,glm::vec3(0,shadowF,0),0.58f,glm::vec3(0),glm::vec3(0),glm::vec3(0),0,0,true);
+        drawHumanoid(shp4,glm::vec3(l4_playerX,shadowF,0),0.58f,glm::vec3(0),glm::vec3(0),glm::vec3(0),0,0,true);
+        // Bayangan enemy 1
+        {
+            float eShadow1=L4_GY;
+            for(auto& w:l4_walls)
+                if(w.alive&&!w.waitingDelay&&(w.y+w.height)<=e1Yr+0.02f&&fabs(l4_ex1X-w.x)<1.15f+w.width)
+                    eShadow1=std::max(eShadow1,w.y+w.height);
+            glm::mat4 sm1=glm::translate(glm::mat4(1.0f),glm::vec3(l4_ex1X,eShadow1+0.01f,0));
+            sm1=glm::scale(sm1,glm::vec3(1.15f,0.04f,0.90f));
+            glUniformMatrix4fv(glGetUniformLocation(shp4,"model"),1,GL_FALSE,glm::value_ptr(sm1));
+            glUniform1f(glGetUniformLocation(shp4,"alpha"),0.30f);
+            glDrawArrays(GL_TRIANGLES,0,36);
+        }
+        // Bayangan enemy 2
+        {
+            float eShadow2=L4_GY;
+            for(auto& w:l4_walls)
+                if(w.alive&&!w.waitingDelay&&(w.y+w.height)<=e2Yr+0.02f&&fabs(l4_ex2X-w.x)<1.15f+w.width)
+                    eShadow2=std::max(eShadow2,w.y+w.height);
+            glm::mat4 sm2=glm::translate(glm::mat4(1.0f),glm::vec3(l4_ex2X,eShadow2+0.01f,0));
+            sm2=glm::scale(sm2,glm::vec3(1.15f,0.04f,0.90f));
+            glUniformMatrix4fv(glGetUniformLocation(shp4,"model"),1,GL_FALSE,glm::value_ptr(sm2));
+            glUniform1f(glGetUniformLocation(shp4,"alpha"),0.30f);
+            glDrawArrays(GL_TRIANGLES,0,36);
+        }
 
         // Tangga — gradient merah tua → ungu (tema badai)
         sU(sp4,pj,vw);
@@ -2614,8 +2645,6 @@ bool runGame4(){
         }
 
         // Player
-        float e1Yr=l4p.standingY+4.5f+sinf(l4_ex1Phase)*0.5f;
-        float e2Yr=l4p.standingY+6.5f+sinf(l4_ex2Phase)*0.6f;
         bool l4Moving=l4_keysHeld[GLFW_KEY_A]||l4_keysHeld[GLFW_KEY_D]||l4_keysHeld[GLFW_KEY_LEFT]||l4_keysHeld[GLFW_KEY_RIGHT];
         float leg=l4p.onGround?(l4Moving?sinf(l4p.animTimer*3.0f)*8.0f:0.0f):-22.0f;
         float arm=l4p.onGround?(l4Moving?sinf(l4p.animTimer*3.0f)*8.0f:0.0f):-30.0f;
@@ -2642,10 +2671,12 @@ bool runGame4(){
         dC(sp4,glm::vec3(l4_ex2X,e2Yr,0),glm::vec3(1.15f,0.68f,0.90f),ec2*pulse2);
         dC(sp4,glm::vec3(l4_ex2X-1.55f,e2Yr+0.12f,0),glm::vec3(0.72f,0.28f,0.78f),ec2*0.60f);
         dC(sp4,glm::vec3(l4_ex2X+1.55f,e2Yr+0.12f,0),glm::vec3(0.72f,0.28f,0.78f),ec2*0.60f);
-        dC(sp4,glm::vec3(l4_ex2X-0.32f,e2Yr+0.28f,0.55f),glm::vec3(0.15f,0.15f,0.15f),glm::vec3(0.9f,0.7f,1.0f));
-        dC(sp4,glm::vec3(l4_ex2X+0.32f,e2Yr+0.28f,0.55f),glm::vec3(0.15f,0.15f,0.15f),glm::vec3(0.9f,0.7f,1.0f));
-        dC(sp4,glm::vec3(l4_ex2X-0.32f,e2Yr+0.28f,0.60f),glm::vec3(0.09f,0.09f,0.14f),glm::vec3(0.05f,0.05f,0.05f));
-        dC(sp4,glm::vec3(l4_ex2X+0.32f,e2Yr+0.28f,0.60f),glm::vec3(0.09f,0.09f,0.14f),glm::vec3(0.05f,0.05f,0.05f));
+        // Eye whites — body half-depth = 0.45, dorong jauh lebih ke depan biar ga ketelan (z-fighting)
+        dC(sp4,glm::vec3(l4_ex2X-0.32f,e2Yr+0.28f,0.80f),glm::vec3(0.18f,0.18f,0.10f),glm::vec3(0.95f,0.85f,1.0f));
+        dC(sp4,glm::vec3(l4_ex2X+0.32f,e2Yr+0.28f,0.80f),glm::vec3(0.18f,0.18f,0.10f),glm::vec3(0.95f,0.85f,1.0f));
+        // Pupils
+        dC(sp4,glm::vec3(l4_ex2X-0.32f,e2Yr+0.28f,0.86f),glm::vec3(0.10f,0.10f,0.10f),glm::vec3(0.08f,0.02f,0.18f));
+        dC(sp4,glm::vec3(l4_ex2X+0.32f,e2Yr+0.28f,0.86f),glm::vec3(0.10f,0.10f,0.10f),glm::vec3(0.08f,0.02f,0.18f));
         float si2b=std::min(l4_ex2Shoot/std::max(1.1f,2.8f-l4_wallsPassed*0.04f),1.0f);
         dC(sp4,glm::vec3(l4_ex2X,e2Yr-0.62f,0.5f),glm::vec3(0.12f*si2b+0.02f,0.12f*si2b+0.02f,0.05f),
            glm::mix(glm::vec3(0.8f,0.5f,0.95f),glm::vec3(0.95f,0.1f,0.9f),si2b));

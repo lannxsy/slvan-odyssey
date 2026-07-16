@@ -210,7 +210,7 @@ void spawnWall(bool forceSame=false,float delay=0){
     w.id=wallsPassed+1; w.height=0.16f;
     w.passed=w.playerOn=w.isFrozen=false; w.alive=true;
     w.waitingDelay=(delay>0); w.delayTimer=delay;
-    w.width=std::max(6.f-(wallsPassed/10)*0.55f,1.5f);
+    w.width=std::max(6.f-(wallsPassed/5)*0.55f,1.5f);
     bool right=forceSame?!spawnFromRight:spawnFromRight;
     w.speedSign=right?-1.f:1.f;
     w.x=w.waitingDelay?999.f:(right?16.f:-16.f);

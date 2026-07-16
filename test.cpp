@@ -420,11 +420,11 @@ bool runGame(){
             wallSpeed=std::min(5.5f+(float)wallsPassed*0.45f,22.f);      // makin banyak skor, wall makin cepet gerak (tapi dibatesin max 22)
 
             // ///////////////////// ROKET (MUNCUL TIAP KELIPATAN SKOR TERTENTU) ////////////////
-            int ms=wallsPassed/5;                                      // hitung "level milestone" (tiap 10 skor naik 1 level)
+            int ms=wallsPassed/5;                                      // hitung "level milestone" (tiap 5 skor naik 1 level)
             if(ms>0&&ms>lastMilestone){                                  // kalau level milestone-nya baru (belum pernah dicapai sebelumnya)
                 lastMilestone=ms;                                        // update milestone terakhir
                 std::mt19937 rng(std::random_device{}());               // siapin generator angka acak
-                std::uniform_real_distribution<float> xd(-5.5f,5.5f);    // rentang posisi x acak buat roket
+                std::uniform_real_distribution<float> xd(-4.4f,4.4f);    // rentang posisi x acak buat roket
                 for(int k=0;k<2;k++) rockets.push_back({xd(rng), player.pos.y+8.f, -(7.f+ms*.3f), 0, true}); // munculin 2 roket di atas pemain, meluncur turun makin cepet seiring level makin tinggi
             }
             for(auto& r:rockets){                                       // update posisi & cek tabrakan tiap roket
@@ -493,7 +493,7 @@ bool runGame(){
             setUniforms(shadowProg,proj,view);                              // pindah pakai shader khusus bayangan
             float sf=GROUND_Y;                                              // sf = ketinggian permukaan tempat bayangan bakal digambar (default lantai)
             for(auto& w:walls)                                              // cari wall tertinggi yang ada tepat di bawah pemain (buat bayangan nempel di situ, bukan tembus wall)
-                if(w.alive&&!w.waitingDelay&&w.y+w.height<=player.pos.y+0.02f&&fabs(player.pos.x-w.x)<PHW+w.width) sf=std::max(sf,w.y+w.height);
+                if(w.alive&&!w.waitingDelay&&w.y+w.height<=player.pos.y+0.02f&&fabs(player.pos.x-w.x)<PHW+w.width) sf=std::max(sf,w.y+w.height);// cari pijakan (top wall) tertinggi di bawah/sejajar player yang masih dalam jangkauan x, buat nentuin ketinggian pijakan yang bener
             float h=std::max(player.pos.y-sf,0.f);                          // hitung seberapa tinggi pemain dari permukaan bayangan
             float rX=std::max(0.55f-h*.045f,.18f), rZ=std::max(0.32f-h*.025f,.10f), al=std::max(0.85f-h*.07f,.15f), sy=sf+0.08f; // makin tinggi pemain, bayangan makin kecil & makin transparan (efek realistis)
             glUniform3f(glGetUniformLocation(shadowProg,"shadowCenter"),player.pos.x,sy,player.pos.z); // kirim posisi tengah bayangan

@@ -520,6 +520,8 @@ bool runGame(){
         drawPlayer(shaderProg,player.pos,0.58f);                         // gambar karakter pemain di posisinya sekarang
 
         // =============================== HUD (TEKS & INFO DI LAYAR) ===============================
+
+        // SCR_W = Screen Width — variabel yang nyimpen lebar layar/window game dalam pixel.
         {
             glDisable(GL_DEPTH_TEST);                                    // matiin depth test biar HUD selalu di depan (gak ketiban objek 3D)
             glm::mat4 hudP=glm::ortho(0.f,(float)SCR_W,(float)SCR_H,0.f,-1.f,1.f); // proyeksi 2D biasa (bukan perspektif) khusus buat HUD
@@ -543,9 +545,9 @@ bool runGame(){
             // ///////////////////////////// TAMPILAN PAUSE /////////////////////////////
             if(gameState==PAUSED){
                 float ox=SCR_W/2.f, oy=SCR_H/2.f;                        // titik tengah layar
-                renderRect(0,0,(float)SCR_W,(float)SCR_H,0.02f,0.06f,0.03f,0.72f); // overlay gelap penuh layar
+                renderRect(0,0,(float)SCR_W,(float)SCR_H,0.02f,0.06f,0.03f,0.72f); // overlay gelap penuh layar, rgb opacity
                 renderRect(ox-155,oy-95,310,190,0.04f,0.11f,0.06f,0.97f);          // kotak panel pause di tengah
-                renderText("PAUSED",ox-6*8*3.f/2,oy-60,3,0.32f,0.98f,0.48f);       // judul "PAUSED"
+                renderText("PAUSED",ox-6*8*3.f/2,oy-60,3,0.32f,0.98f,0.48f);       // judul "PAUSED"   jummlah kata + lebar dasar 1 pixel + skala ukuran text
                 renderText("ESC/P - RESUME",ox-14*8*1.5f/2,oy,1.5f,0.72f,0.92f,0.74f); // petunjuk resume
                 renderText("R - RESTART",ox-11*8*1.5f/2,oy+30,1.5f,0.72f,0.92f,0.74f); // petunjuk restart
                 renderText("SCORE "+std::to_string(wallsPassed),ox-8*8*1.5f/2,oy+60,1.5f,0.5f,0.72f,0.52f); // skor saat pause

@@ -20,6 +20,7 @@
 #include <random>
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
+
 static const char* MENU_HTML = R"HTML(<!DOCTYPE html>
 <html><head><meta charset="UTF-8"><title>Sylvan Odyssey</title><style>
 *{margin:0;padding:0;box-sizing:border-box;} html,body{width:100%;height:100%;overflow:hidden;background:#0a1a0f;font-family:serif;}
@@ -43,6 +44,8 @@ p{color:#86b390;letter-spacing:5px;text-transform:uppercase;margin-bottom:60px;}
 </div></div>
 <div class="foot">STMIK AMIK Bandung &copy; 2026</div>
 </div></body></html>)HTML";
+
+
 const unsigned int SCR_W=900, SCR_H=600;
 glm::vec3 camPos(0,2.5f,13), camFront(0,-0.15f,-1), camUp(0,1,0);
 float camTargetY=2.5f;
@@ -69,7 +72,7 @@ const glm::vec3 COL_ROCKET_BODY(0.85f,0.85f,0.9f);
 const glm::vec3 COL_ROCKET_NOSE(0.85f,0.1f,0.05f);
 const glm::vec3 COL_ROCKET_FIN(0.5f,0.5f,0.6f);
 const glm::vec3 COL_FLAME(1.0f,0.5f,0.05f);
-struct Player{ glm::vec3 pos{0,0,0}; float velY=0, animTimer=0, standingY=0; bool onGround=true; } player;
+struct Player{ glm::vec3 pos{0,0,0}; float velY=0, standingY=0; bool onGround=true; } player;
 struct Wall{ float x,y,width,height,speedSign,delayTimer; int id; bool passed,alive,playerOn,isFrozen,waitingDelay; };
 std::vector<Wall> walls;
 float wallSpeed=5.5f;
@@ -185,20 +188,12 @@ void drawCube(unsigned int prog,glm::vec3 pos,glm::vec3 sc,glm::vec3 col,float a
     glUniform1f(glGetUniformLocation(prog,"alpha"),a);
     glDrawArrays(GL_TRIANGLES,0,36);
 }
-void drawLimb(unsigned int prog,glm::vec3 pivot,float angle,glm::vec3 offset,glm::vec3 sc,glm::vec3 col){
-    glm::mat4 m=glm::translate(glm::mat4(1),pivot);
-    m=glm::rotate(m,glm::radians(angle),glm::vec3(1,0,0)); m=glm::translate(m,offset); m=glm::scale(m,sc);
-    glUniformMatrix4fv(glGetUniformLocation(prog,"model"),1,GL_FALSE,glm::value_ptr(m));
-    glUniform3fv(glGetUniformLocation(prog,"objectColor"),1,glm::value_ptr(col));
-    glUniform1f(glGetUniformLocation(prog,"alpha"),1);
-    glDrawArrays(GL_TRIANGLES,0,36);
-}
-void drawPlayer(unsigned int prog,glm::vec3 base,float s,float leg,float arm){
-    drawLimb(prog,base+glm::vec3(-s*.2f,s*.3f,0), leg,{0,-s*.3f,0},{s*.16f,s*.3f,s*.16f},COL_PLAYER_LIMB);
-    drawLimb(prog,base+glm::vec3( s*.2f,s*.3f,0),-leg,{0,-s*.3f,0},{s*.16f,s*.3f,s*.16f},COL_PLAYER_LIMB);
+void drawPlayer(unsigned int prog,glm::vec3 base,float s){
+    drawCube(prog,base+glm::vec3(-s*.2f,s*.15f,0),{s*.16f,s*.3f,s*.16f},COL_PLAYER_LIMB);
+    drawCube(prog,base+glm::vec3( s*.2f,s*.15f,0),{s*.16f,s*.3f,s*.16f},COL_PLAYER_LIMB);
     drawCube(prog,base+glm::vec3(0,s*.85f,0),{s*.36f,s*.38f,s*.2f},COL_PLAYER_BODY);
-    drawLimb(prog,base+glm::vec3(-s*.52f,s*.95f,0),-arm,{0,-s*.24f,0},{s*.14f,s*.26f,s*.14f},COL_PLAYER_LIMB);
-    drawLimb(prog,base+glm::vec3( s*.52f,s*.95f,0), arm,{0,-s*.24f,0},{s*.14f,s*.26f,s*.14f},COL_PLAYER_LIMB);
+    drawCube(prog,base+glm::vec3(-s*.52f,s*.71f,0),{s*.14f,s*.26f,s*.14f},COL_PLAYER_LIMB);
+    drawCube(prog,base+glm::vec3( s*.52f,s*.71f,0),{s*.14f,s*.26f,s*.14f},COL_PLAYER_LIMB);
     drawCube(prog,base+glm::vec3(0,s*1.52f,0),{s*.33f,s*.3f,s*.26f},COL_PLAYER_SKIN);
     drawCube(prog,base+glm::vec3(-s*.13f,s*1.59f,s*.30f),{s*.07f,s*.07f,s*.04f},COL_EYE_WHITE);
     drawCube(prog,base+glm::vec3(-s*.13f,s*1.59f,s*.35f),{s*.04f,s*.04f,s*.03f},COL_EYE_BLACK);
@@ -279,7 +274,7 @@ bool runGame(){
         dt=std::min(now-lastFrame,0.05f); lastFrame=now;
         if(hitCooldown>0) hitCooldown-=dt;
         if(gameState==PLAYING){
-            gameTime+=dt; player.animTimer+=dt;
+            gameTime+=dt;
             player.velY+=GRAVITY*dt; player.pos.y+=player.velY*dt;
             if(keys[GLFW_KEY_A]||keys[GLFW_KEY_LEFT])  player.pos.x-=PSPEED*dt;
             if(keys[GLFW_KEY_D]||keys[GLFW_KEY_RIGHT]) player.pos.x+=PSPEED*dt;
@@ -397,9 +392,7 @@ bool runGame(){
             drawCube(shaderProg,{r.x,r.y+0.4f,0}, {0.34f,0.14f,0.14f},COL_ROCKET_FIN);
             drawCube(shaderProg,{r.x,r.y+0.85f,0},{fl,0.3f,fl},COL_FLAME,0.85f);
         }
-        float leg=player.onGround?sinf(player.animTimer*3)*8.f:-22.f;
-        float arm=player.onGround?sinf(player.animTimer*3)*8.f:-30.f;
-        drawPlayer(shaderProg,player.pos,0.58f,leg,arm);
+        drawPlayer(shaderProg,player.pos,0.58f);
         {
             glDisable(GL_DEPTH_TEST);
             glm::mat4 hudP=glm::ortho(0.f,(float)SCR_W,(float)SCR_H,0.f,-1.f,1.f);

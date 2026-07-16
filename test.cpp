@@ -1,43 +1,40 @@
-// ============================================================================
-// SYLVAN ODYSSEY - main.cpp (VERSI BERKOMENTAR)
-// Game platformer 3D sederhana pakai OpenGL: pemain melompat dari platform
-// (Wall) ke platform sambil menghindari ROKET yang terbang dari bawah ke atas.
-// File ini dijelaskan baris-per-baris dalam bahasa Indonesia, dengan fokus
-// khusus pada bagian ROKET (struct Rocket, spawn, update, gambar, tabrakan).
-// ============================================================================
+// =====================================================================================
+// g++ main.cpp glad.c -o game -DWEBVIEW_WINAPI -Iinclude -Iinclude/glm -lglfw3 -lopengl32 -lgdi32 -lole32 -lcomctl32 -loleaut32 -luuid
 
-#define WEBVIEW_IMPLEMENTATION      // Aktifkan implementasi library webview.h (bukan cuma deklarasi)
-#include "webview.h"                 // Library untuk menampilkan jendela HTML (dipakai buat menu utama)
-#if defined(_WIN32)||defined(_WIN64) // Jika compile di Windows...
-  #define WIN32_LEAN_AND_MEAN        // Kurangi header Windows yang jarang dipakai, biar compile lebih cepat
-  #include <windows.h>                // API Windows (dipakai untuk pindah posisi jendela, sleep, dll)
-#else                                 // Jika bukan Windows (Linux/Mac)...
-  #include <unistd.h>                 // Untuk fungsi usleep() (jeda waktu)
+//  SYLVAN ODYSSEY - PENJELASAN KODE (versi gampang dipahami buat UAS)
+//  Game ini intinya: game platformer 3D sederhana pake OpenGL.
+//  Pemain lompat-lompat naik ke atas lewat "wall" (platform) yang bergerak,
+//  sambil hindari platform yang nabrak dari samping & serangan roket.
+//  Menu utama dibikin pake HTML (webview), gamenya sendiri pake OpenGL (GLFW+GLAD).
+// =====================================================================================
+
+#define WEBVIEW_IMPLEMENTATION      // aktifin kode implementasi library webview (biar fungsi2 webview beneran ke-compile, bukan cuma deklarasi)
+#include "webview.h"                 // library buat bikin jendela HTML (dipakai buat tampilan MENU)
+#if defined(_WIN32)||defined(_WIN64) // kalau lagi di-compile di Windows...
+  #define WIN32_LEAN_AND_MEAN        // biar header windows.h gak import semua fitur (biar ringan & gak bentrok)
+  #include <windows.h>               // header khusus windows (dipakai buat Sleep, cari window, dll)
+#else                                // kalau bukan windows (linux/mac)...
+  #include <unistd.h>                // dipakai buat fungsi usleep (delay/jeda waktu)
 #endif
-#include <glad/glad.h>               // Loader fungsi-fungsi OpenGL modern
-#include <GLFW/glfw3.h>              // Library untuk membuat window, keyboard input, dsb
-#include <glm/glm.hpp>               // Library matematika vektor/matriks (vec3, mat4, dll)
-#include <glm/gtc/matrix_transform.hpp> // Fungsi transformasi: translate, rotate, scale, perspective
-#include <glm/gtc/type_ptr.hpp>      // Konversi glm::mat4/vec3 ke pointer float untuk OpenGL
-#include <iostream>                  // std::cerr untuk print error
-#include <vector>                    // std::vector, dipakai untuk list Wall & Rocket
-#include <cmath>                     // fabs, sinf, fmodf, dll
-#include <string>                    // std::string
-#include <algorithm>                 // std::min, std::max, std::remove_if
-#include <atomic>                    // std::atomic<bool>, untuk flag antar-thread yang aman
-#include <random>                    // std::mt19937, untuk posisi acak roket
-#define STB_IMAGE_IMPLEMENTATION     // Aktifkan implementasi stb_image (load gambar), tidak dipakai berat di sini
-#include "stb_image.h"
+#include <glad/glad.h>               // GLAD = loader fungsi-fungsi OpenGL (wajib sebelum pakai OpenGL)
+#include <GLFW/glfw3.h>              // GLFW = library buat bikin window & handle input keyboard
+#include <glm/glm.hpp>               // GLM = library matematika buat grafis 3D (vector, matrix)
+#include <glm/gtc/matrix_transform.hpp> // fungsi transformasi matrix (translate, scale, rotate, dll)
+#include <glm/gtc/type_ptr.hpp>      // buat convert glm::mat4/vec3 jadi pointer float (dibutuhin OpenGL)
+#include <iostream>                  // buat print ke console (cout, cerr)
+#include <vector>                    // buat pakai std::vector (array dinamis)
+#include <cmath>                     // fungsi matematika (sinf, fabs, fmodf, dll)
+#include <string>                    // buat pakai std::string
+#include <algorithm>                 // fungsi std::min, std::max, std::remove_if
+#include <atomic>                    // buat variabel std::atomic (aman dipakai lintas "thread")
+#include <random>                    // buat bikin angka acak (posisi roket random)
+              // library buat load file gambar (walau di kode ini kayaknya gak kepake langsung)
 
-// ----------------------------------------------------------------------------
-// HTML untuk MENU UTAMA (dibuka lewat webview, sebelum masuk ke game 3D)
-// Ini string HTML+CSS+JS mentah. Isinya TIDAK diberi komentar per baris
-// karena itu teks HTML/CSS, bukan kode C++ — kalau disisipi komentar C++
-// (//) akan merusak tampilan menu. Ringkasannya:
-//   - Tombol "Start Journey"  -> memanggil startGame()  -> masuk ke game
-//   - Tombol "HOW TO PLAY"    -> memanggil options()    -> munculkan alert petunjuk
-//   - Tombol "Exit"           -> memanggil exit()       -> keluar aplikasi
-// ----------------------------------------------------------------------------
+// =====================================================================================
+// ///////////////////////////// TAMPILAN MENU (HTML) /////////////////////////////////
+// Bagian ini isinya cuma teks HTML+CSS mentah yang nanti dirender sama webview
+// jadi tampilan MENU AWAL (Start Journey, How To Play, Exit)
+// =====================================================================================
 static const char* MENU_HTML = R"HTML(<!DOCTYPE html>
 <html><head><meta charset="UTF-8"><title>Sylvan Odyssey</title><style>
 *{margin:0;padding:0;box-sizing:border-box;} html,body{width:100%;height:100%;overflow:hidden;background:#0a1a0f;font-family:serif;}
@@ -61,124 +58,83 @@ p{color:#86b390;letter-spacing:5px;text-transform:uppercase;margin-bottom:60px;}
 </div></div>
 <div class="foot">STMIK AMIK Bandung &copy; 2026</div>
 </div></body></html>)HTML";
+// note: tombol2 di HTML di atas kalau diklik bakal manggil window.external.invoke('startGame'/'options'/'exit')
+// nah, panggilan itu bakal ditangkap sama fungsi onMenuInvoke() di bawah nanti.
 
-// ----------------------------------------------------------------------------
-// KONSTANTA & VARIABEL GLOBAL DASAR
-// ----------------------------------------------------------------------------
-const unsigned int SCR_W=900, SCR_H=600;        // Ukuran layar window game (lebar, tinggi) dalam piksel
-glm::vec3 camPos(0,2.5f,13);                    // Posisi kamera di dunia 3D (x, y, z)
-glm::vec3 camFront(0,-0.15f,-1);                // Arah kamera menghadap (sedikit menunduk, ke arah -z)
-glm::vec3 camUp(0,1,0);                         // Arah "atas" kamera, dipakai untuk hitung matriks view
-float camTargetY=2.5f;                          // Target tinggi kamera yang mau dikejar (ikut naik saat pemain naik)
-glm::vec3 lightPos(5,10,6);                     // Posisi sumber cahaya (matahari) di dunia
-glm::vec3 lightColor(1,0.95f,0.85f);            // Warna cahaya (agak kekuningan hangat)
 
-enum GameState{PLAYING,PAUSED,GAME_OVER};       // Kemungkinan status permainan
-GameState gameState=PLAYING;                    // Status game saat ini, mulai dari PLAYING
+// =====================================================================================
+// ///////////////////////// VARIABEL GLOBAL & KONSTANTA GAME /////////////////////////
+// =====================================================================================
+const unsigned int SCR_W=900, SCR_H=600;              // ukuran layar/jendela game (lebar x tinggi)
+glm::vec3 camPos(0,2.5f,13), camFront(0,-0.15f,-1), camUp(0,1,0); // posisi kamera, arah hadap kamera, arah "atas" kamera
+float camTargetY=2.5f;                                // target ketinggian kamera (biar kamera ngikutin pemain naik pelan2/smooth)
+glm::vec3 lightPos(5,10,6), lightColor(1,0.95f,0.85f); // posisi & warna cahaya buat pencahayaan 3D
+enum GameState{PLAYING,PAUSED,GAME_OVER};             // status game: lagi main / lagi pause / udah game over
+GameState gameState=PLAYING;                          // status game sekarang, defaultnya lagi main
+float dt=0, lastFrame=0, gameTime=0, hitCooldown=0;   // dt = delta time (jeda antar frame), lastFrame = waktu frame sebelumnya, gameTime = total waktu main, hitCooldown = jeda kebal setelah kena hit
+int wallsPassed=0, playerLives=5;                     // wallsPassed = skor (jumlah platform yang berhasil dilewati), playerLives = nyawa pemain
+const float GROUND_Y=0, GRAVITY=-28, JUMP_FORCE=10.5f; // GROUND_Y = ketinggian lantai, GRAVITY = gaya gravitasi (nariknya ke bawah), JUMP_FORCE = kekuatan lompatan
+const float PHW=0.36f, PH=1.9f, PSPEED=6, PBOUND=6.8f; // PHW = setengah lebar badan pemain (buat deteksi tabrakan), PH = tinggi pemain, PSPEED = kecepatan gerak kiri/kanan, PBOUND = batas kiri-kanan area main
 
-float dt=0;            // delta time: berapa detik berlalu sejak frame sebelumnya
-float lastFrame=0;     // waktu (glfwGetTime) saat frame terakhir dihitung
-float gameTime=0;      // total waktu berjalan sejak game dimulai/reset
-float hitCooldown=0;   // waktu "kebal" setelah pemain kena hit, supaya tidak damage berkali-kali
+// ///////////////////////////////// WARNA-WARNA OBJEK ////////////////////////////////
+// semua warna disimpen dalem bentuk RGB (0.0 - 1.0), dipake pas gambar objek 3D-nya
+const glm::vec3 COL_SKY(0.55f,0.78f,0.98f);            // warna langit
+const glm::vec3 COL_SUN(1.0f,0.95f,0.35f);             // warna matahari
+const glm::vec3 COL_GROUND(0.32f,0.58f,0.24f);         // warna tanah/lantai
+const glm::vec3 COL_GROUND_TOP(0.42f,0.72f,0.32f);     // warna rumput di atas tanah
+const glm::vec3 COL_WALL(0.2f,0.75f,0.35f);            // warna platform/wall biasa
+const glm::vec3 COL_WALL_EDGE(0.35f,0.95f,0.5f);       // warna pinggiran/tepi platform (biar keliatan garis atasnya)
+const glm::vec3 COL_PLAYER_BODY(0.2f,0.55f,0.95f);     // warna badan pemain
+const glm::vec3 COL_PLAYER_SKIN(0.96f,0.8f,0.62f);     // warna kulit (kepala) pemain
+const glm::vec3 COL_PLAYER_LIMB(0.12f,0.22f,0.6f);     // warna tangan/kaki pemain
+const glm::vec3 COL_EYE_WHITE(0.95f,0.95f,0.95f);      // warna putih mata
+const glm::vec3 COL_EYE_BLACK(0.05f,0.05f,0.05f);      // warna hitam bola mata
 
-int wallsPassed=0;     // skor: jumlah platform (wall) yang berhasil dilewati/diinjak
-int playerLives=5;     // nyawa pemain, mulai dari 5
+// ///////////////////////////////////// ROKET /////////////////////////////////////
+// warna-warna buat bagian-bagian roket yang jadi rintangan/serangan
+const glm::vec3 COL_ROCKET_BODY(0.85f,0.85f,0.9f);     // warna badan roket
+const glm::vec3 COL_ROCKET_NOSE(0.85f,0.1f,0.05f);     // warna ujung/hidung roket (runcing merah)
+const glm::vec3 COL_ROCKET_FIN(0.5f,0.5f,0.6f);        // warna sirip roket
+const glm::vec3 COL_FLAME(1.0f,0.5f,0.05f);            // warna api/semburan roket
 
-const float GROUND_Y=0;       // ketinggian tanah/lantai dasar
-const float GRAVITY=-28;      // percepatan gravitasi (negatif = menarik ke bawah)
-const float JUMP_FORCE=10.5f; // kecepatan awal ke atas saat pemain lompat
+// ///////////////////////////////// KARAKTER (PLAYER) /////////////////////////////////
+struct Player{ glm::vec3 pos{0,0,0}; float velY=0, standingY=0; bool onGround=true; } player;
+// pos = posisi pemain (x,y,z), velY = kecepatan vertikal (buat lompat/jatuh),
+// standingY = ketinggian platform tempat pemain lagi berdiri, onGround = lagi nginjek tanah/platform atau nggak
+// "player" di belakang struct itu langsung bikin 1 variabel global bernama player
 
-const float PHW=0.36f;   // Player Half-Width: setengah lebar hitbox pemain (untuk deteksi tabrakan)
-const float PH=1.9f;     // Player Height: tinggi hitbox pemain
-const float PSPEED=6;    // kecepatan gerak kiri-kanan pemain
-const float PBOUND=6.8f; // batas kiri/kanan area gerak pemain (tidak boleh keluar dari sini)
+// ///////////////////////////////////// WALL (PLATFORM) ///////////////////////////////
+struct Wall{ float x,y,width,height,speedSign,delayTimer; int id; bool passed,alive,playerOn,isFrozen,waitingDelay; };
+// x,y = posisi wall, width/height = ukuran wall, speedSign = arah gerak (+1 kanan / -1 kiri)
+// delayTimer = hitungan mundur sebelum wall ini muncul/gerak, id = nomor urut wall
+// passed = udah pernah diinjek/dilewatin pemain?, alive = wall ini masih aktif/belum dihapus?
+// playerOn = lagi ada pemain di atasnya?, isFrozen = wall berhenti gerak (biasanya abis ketabrak/dipake buat pijakan)
+// waitingDelay = wall ini lagi nunggu delay sebelum muncul di layar
+std::vector<Wall> walls;                               // kumpulan semua wall yang lagi aktif di game
+float wallSpeed=5.5f;                                  // kecepatan gerak wall (makin lama makin cepet, bikin susah)
+bool spawnFromRight=false;                             // penanda wall berikutnya nongol dari kanan atau kiri (biar gantian)
 
-// ----------------------------------------------------------------------------
-// WARNA-WARNA OBJEK (RGB, masing-masing 0.0 - 1.0)
-// ----------------------------------------------------------------------------
-const glm::vec3 COL_SKY(0.55f,0.78f,0.98f);         // warna panel langit
-const glm::vec3 COL_SUN(1.0f,0.95f,0.35f);          // warna matahari
-const glm::vec3 COL_GROUND(0.32f,0.58f,0.24f);      // warna tanah
-const glm::vec3 COL_GROUND_TOP(0.42f,0.72f,0.32f);  // warna lapisan rumput di atas tanah
-const glm::vec3 COL_WALL(0.2f,0.75f,0.35f);         // warna badan platform (wall)
-const glm::vec3 COL_WALL_EDGE(0.35f,0.95f,0.5f);    // warna tepi/garis atas platform
-const glm::vec3 COL_PLAYER_BODY(0.2f,0.55f,0.95f);  // warna badan pemain
-const glm::vec3 COL_PLAYER_SKIN(0.96f,0.8f,0.62f);  // warna kepala/kulit pemain
-const glm::vec3 COL_PLAYER_LIMB(0.12f,0.22f,0.6f);  // warna tangan & kaki pemain
-const glm::vec3 COL_EYE_WHITE(0.95f,0.95f,0.95f);   // warna putih mata
-const glm::vec3 COL_EYE_BLACK(0.05f,0.05f,0.05f);   // warna bola mata (pupil)
+// ///////////////////////////////////// ROKET (DATA) //////////////////////////////////
+struct Rocket{ float x,y,velY,trail; bool alive; };
+// x,y = posisi roket, velY = kecepatan vertikal roket (biasanya minus = ke bawah/nyamber ke pemain)
+// trail = penghitung waktu buat animasi api di ekor roket, alive = roket ini masih aktif/belum dihapus
+std::vector<Rocket> rockets;                           // kumpulan semua roket yang lagi meluncur
+int lastMilestone=0;                                   // nyimpen milestone/skor kelipatan terakhir (buat munculin roket tiap kelipatan skor tertentu)
 
-// --- Warna khusus ROKET ---
-const glm::vec3 COL_ROCKET_BODY(0.85f,0.85f,0.9f);  // warna badan roket (abu-abu terang, mirip logam)
-const glm::vec3 COL_ROCKET_NOSE(0.85f,0.1f,0.05f);  // warna ujung/hidung roket (merah)
-const glm::vec3 COL_ROCKET_FIN(0.5f,0.5f,0.6f);     // warna sirip roket (abu-abu gelap)
-const glm::vec3 COL_FLAME(1.0f,0.5f,0.05f);         // warna api/knalpot roket (oranye)
-
-// ----------------------------------------------------------------------------
-// STRUCT PLAYER: data pemain
-// ----------------------------------------------------------------------------
-struct Player{
-    glm::vec3 pos{0,0,0}; // posisi pemain di dunia (x,y,z)
-    float velY=0;         // kecepatan vertikal saat ini (untuk gravitasi & lompat)
-    float animTimer=0;    // timer untuk animasi jalan (ayunan tangan/kaki)
-    float standingY=0;    // ketinggian platform tempat pemain berdiri terakhir
-    bool onGround=true;   // apakah pemain sedang menapak di sesuatu (tanah/platform)
-} player;
-
-// ----------------------------------------------------------------------------
-// STRUCT WALL: platform yang bergerak dari kiri/kanan, tempat pemain melompat
-// ----------------------------------------------------------------------------
-struct Wall{
-    float x,y;          // posisi platform
-    float width,height;  // ukuran platform (lebar & tinggi setengah, karena dipakai sebagai scale cube)
-    float speedSign;     // arah gerak: -1 (ke kiri) atau +1 (ke kanan)
-    float delayTimer;    // sisa waktu tunda sebelum platform ini mulai muncul/bergerak
-    int id;               // nomor urut platform
-    bool passed;          // apakah pemain sudah pernah menginjak platform ini
-    bool alive;           // apakah platform ini masih aktif (belum dihapus)
-    bool playerOn;        // apakah pemain sedang berdiri di atas platform ini (frame ini)
-    bool isFrozen;        // apakah platform berhenti bergerak (setelah diinjak atau menabrak pemain)
-    bool waitingDelay;    // apakah platform masih menunggu delayTimer sebelum aktif
-};
-std::vector<Wall> walls;   // daftar semua platform yang sedang ada di layar
-float wallSpeed=5.5f;      // kecepatan gerak platform saat ini (makin lama makin cepat)
-bool spawnFromRight=false; // menentukan platform berikutnya muncul dari kanan atau kiri (bergantian)
-
-// ----------------------------------------------------------------------------
-// ★★★ STRUCT ROCKET ★★★  <-- INI BAGIAN UTAMA YANG KAMU TANYAKAN
-// Roket adalah RINTANGAN yang terbang vertikal (dari bawah ke atas) dan bisa
-// mengenai/melukai pemain kalau posisinya bersinggungan.
-// ----------------------------------------------------------------------------
-struct Rocket{
-    float x;      // posisi horizontal roket (tetap, roket tidak bergerak ke kiri/kanan)
-    float y;      // posisi vertikal roket (ini yang berubah tiap frame, roket "naik")
-    float velY;   // kecepatan vertikal roket. Perhatikan: nilainya NEGATIF saat di-spawn
-                  // (lihat kode spawn di bawah: -(7.f+ms*.3f)), artinya y akan BERKURANG,
-                  // jadi sebenarnya roket bergerak TURUN, bukan naik. Ini "hujan roket dari atas".
-    float trail;  // timer kecil untuk animasi kedipan api di ekor roket
-    bool alive;   // apakah roket ini masih aktif (belum kena hapus)
-};
-std::vector<Rocket> rockets; // daftar semua roket yang sedang aktif di layar
-
-int lastMilestone=0; // menyimpan "milestone" skor terakhir (kelipatan 10) yang sudah memicu roket
-
-// ----------------------------------------------------------------------------
-// SHADER SOURCE (kode GLSL untuk GPU) - komentar GLSL pakai // juga aman
-// ----------------------------------------------------------------------------
-// Vertex shader utama: menghitung posisi akhir tiap titik (vertex) di layar,
-// dan mengirim posisi dunia + normal ke fragment shader untuk pencahayaan.
+// =====================================================================================
+// ///////////////////////////////// SHADER (KODE GPU) /////////////////////////////////
+// Shader itu program kecil yang jalan di GPU buat ngegambar objek 3D + pencahayaannya
+// =====================================================================================
 const char* vertSrc=R"(#version 330 core
 layout(location=0) in vec3 aPos; layout(location=1) in vec3 aNormal; out vec3 FragPos, Normal; uniform mat4 model, view, projection;
 void main(){ FragPos=vec3(model*vec4(aPos,1)); Normal=mat3(transpose(inverse(model)))*aNormal; gl_Position=projection*view*vec4(FragPos,1); })";
+// ^ VERTEX SHADER: ngitung posisi tiap titik/vertex objek 3D di layar (dikonversi dari posisi lokal ke posisi layar)
 
-// Fragment shader utama: menghitung warna akhir tiap piksel berdasarkan
-// arah cahaya sederhana (diffuse lighting) dan warna objek.
 const char* fragSrc=R"(#version 330 core
 out vec4 FragColor; in vec3 FragPos, Normal; uniform vec3 lightPos, lightColor, objectColor; uniform float alpha;
 void main(){ float diff=max(dot(normalize(Normal),normalize(lightPos-FragPos)),0.0); FragColor=vec4((0.38+diff*0.62)*lightColor*objectColor,alpha); })";
+// ^ FRAGMENT SHADER: nentuin warna akhir tiap pixel objek, termasuk efek cahaya (makin ngadep ke cahaya, makin terang)
 
-// Fragment shader untuk BAYANGAN (shadow) elips di bawah pemain: menggambar
-// lingkaran/elips gelap yang memudar di tepinya.
 const char* shadowFragSrc=R"(#version 330 core
 out vec4 FragColor; in vec3 FragPos; uniform float alpha; uniform vec3 shadowCenter; uniform vec2 shadowRadius;
 void main(){
@@ -186,15 +142,14 @@ void main(){
     if(d>1.0) discard;
     FragColor=vec4(0,0,0,alpha*(1.0-d));
 })";
+// ^ shader khusus buat gambar BAYANGAN pemain di lantai/platform (bentuknya oval, makin ke pinggir makin transparan)
 
-// ----------------------------------------------------------------------------
-// FONT BITMAP 8x8 untuk menampilkan teks (skor, HUD, dsb) tanpa file gambar.
-// Setiap karakter (96 karakter ASCII 32-127) direpresentasikan 8 byte,
-// tiap byte = 1 baris piksel (bit 1 = piksel menyala).
-// ----------------------------------------------------------------------------
+// =====================================================================================
+// //////////////////////////////// FONT 8x8 (TEKS/HUD) ////////////////////////////////
+// FONT8 ini tabel data bitmap huruf ukuran 8x8 pixel (dipakai buat nampilin teks di HUD/skor)
+// tiap huruf disimpen sebagai 8 angka byte (tiap byte = 1 baris pixel, 8 bit = 8 pixel on/off)
+// =====================================================================================
 static const unsigned char FONT8[96][8]={
-// (data font, tidak diberi komentar per-angka karena ini murni data bitmap
-// piksel huruf, bukan logika program)
 {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00},{0x18,0x3C,0x3C,0x18,0x18,0x00,0x18,0x00},{0x6C,0x6C,0x28,0x00,0x00,0x00,0x00,0x00},{0x6C,0x6C,0xFE,0x6C,0xFE,0x6C,0x6C,0x00},{0x18,0x7C,0xD0,0x7C,0x16,0xFC,0x18,0x00},{0xC2,0xC6,0x0C,0x18,0x30,0x66,0xC6,0x00},{0x38,0x6C,0x38,0x76,0xDC,0xCC,0x76,0x00},{0x18,0x18,0x30,0x00,0x00,0x00,0x00,0x00},{0x0C,0x18,0x30,0x30,0x30,0x18,0x0C,0x00},{0x30,0x18,0x0C,0x0C,0x0C,0x18,0x30,0x00},{0x00,0x66,0x3C,0xFF,0x3C,0x66,0x00,0x00},{0x00,0x18,0x18,0x7E,0x18,0x18,0x00,0x00},{0x00,0x00,0x00,0x00,0x00,0x18,0x18,0x30},{0x00,0x00,0x00,0x7E,0x00,0x00,0x00,0x00},{0x00,0x00,0x00,0x00,0x00,0x18,0x18,0x00},{0x02,0x06,0x0C,0x18,0x30,0x60,0xC0,0x00},
 {0x7C,0xC6,0xCE,0xD6,0xE6,0xC6,0x7C,0x00},{0x18,0x38,0x18,0x18,0x18,0x18,0x7E,0x00},{0x7C,0xC6,0x06,0x1C,0x70,0xC6,0xFE,0x00},{0x7C,0xC6,0x06,0x3C,0x06,0xC6,0x7C,0x00},{0x1C,0x3C,0x6C,0xCC,0xFE,0x0C,0x1E,0x00},{0xFE,0xC0,0xFC,0x06,0x06,0xC6,0x7C,0x00},{0x3C,0x60,0xC0,0xFC,0xC6,0xC6,0x7C,0x00},{0xFE,0xC6,0x0C,0x18,0x30,0x30,0x30,0x00},{0x7C,0xC6,0xC6,0x7C,0xC6,0xC6,0x7C,0x00},{0x7C,0xC6,0xC6,0x7E,0x06,0x0C,0x78,0x00},{0x00,0x18,0x18,0x00,0x00,0x18,0x18,0x00},{0x00,0x18,0x18,0x00,0x00,0x18,0x18,0x30},{0x0C,0x18,0x30,0x60,0x30,0x18,0x0C,0x00},{0x00,0x00,0x7E,0x00,0x7E,0x00,0x00,0x00},{0x60,0x30,0x18,0x0C,0x18,0x30,0x60,0x00},{0x7C,0xC6,0x0C,0x18,0x18,0x00,0x18,0x00},
 {0x7C,0xC6,0xDE,0xDE,0xDE,0xC0,0x7C,0x00},{0x10,0x38,0x6C,0xC6,0xFE,0xC6,0xC6,0x00},{0xFC,0x66,0x66,0x7C,0x66,0x66,0xFC,0x00},{0x3C,0x66,0xC0,0xC0,0xC0,0x66,0x3C,0x00},{0xF8,0x6C,0x66,0x66,0x66,0x6C,0xF8,0x00},{0xFE,0x62,0x68,0x78,0x68,0x62,0xFE,0x00},{0xFE,0x62,0x68,0x78,0x68,0x60,0xF0,0x00},{0x3C,0x66,0xC0,0xC0,0xCE,0x66,0x3A,0x00},{0xC6,0xC6,0xC6,0xFE,0xC6,0xC6,0xC6,0x00},{0x3C,0x18,0x18,0x18,0x18,0x18,0x3C,0x00},{0x1E,0x0C,0x0C,0x0C,0xCC,0xCC,0x78,0x00},{0xE6,0x66,0x6C,0x78,0x6C,0x66,0xE6,0x00},{0xF0,0x60,0x60,0x60,0x62,0x66,0xFE,0x00},{0xC6,0xEE,0xFE,0xD6,0xC6,0xC6,0xC6,0x00},{0xC6,0xE6,0xF6,0xDE,0xCE,0xC6,0xC6,0x00},{0x38,0x6C,0xC6,0xC6,0xC6,0x6C,0x38,0x00},
@@ -202,569 +157,483 @@ static const unsigned char FONT8[96][8]={
 {0x18,0x18,0x0C,0x00,0x00,0x00,0x00,0x00},{0x00,0x00,0x78,0x0C,0x7C,0xCC,0x76,0x00},{0xE0,0x60,0x60,0x7C,0x66,0x66,0xDC,0x00},{0x00,0x00,0x78,0xCC,0xC0,0xCC,0x78,0x00},{0x1C,0x0C,0x0C,0x7C,0xCC,0xCC,0x76,0x00},{0x00,0x00,0x78,0xCC,0xFC,0xC0,0x78,0x00},{0x38,0x6C,0x60,0xF0,0x60,0x60,0xF0,0x00},{0x00,0x00,0x76,0xCC,0xCC,0x7C,0x0C,0xF8},{0xE0,0x60,0x6C,0x76,0x66,0x66,0xE6,0x00},{0x18,0x00,0x38,0x18,0x18,0x18,0x3C,0x00},{0x06,0x00,0x06,0x06,0x06,0x66,0x66,0x3C},{0xE0,0x60,0x66,0x6C,0x78,0x6C,0xE6,0x00},{0x38,0x18,0x18,0x18,0x18,0x18,0x3C,0x00},{0x00,0x00,0xCC,0xFE,0xD6,0xC6,0xC6,0x00},{0x00,0x00,0xF8,0xCC,0xCC,0xCC,0xCC,0x00},{0x00,0x00,0x78,0xCC,0xCC,0xCC,0x78,0x00},
 {0x00,0x00,0xDC,0x66,0x66,0x7C,0x60,0xF0},{0x00,0x00,0x76,0xCC,0xCC,0x7C,0x0C,0x1E},{0x00,0x00,0xDC,0x76,0x66,0x60,0xF0,0x00},{0x00,0x00,0x7C,0xC0,0x78,0x0C,0xF8,0x00},{0x10,0x30,0x7C,0x30,0x30,0x34,0x18,0x00},{0x00,0x00,0xCC,0xCC,0xCC,0xCC,0x76,0x00},{0x00,0x00,0xCC,0xCC,0xCC,0x78,0x30,0x00},{0x00,0x00,0xC6,0xC6,0xD6,0xFE,0x6C,0x00},{0x00,0x00,0xC6,0x6C,0x38,0x6C,0xC6,0x00},{0x00,0x00,0xCC,0xCC,0xCC,0x7C,0x0C,0xF8},{0x00,0x00,0xFC,0x98,0x30,0x64,0xFC,0x00},{0x1C,0x30,0x30,0xE0,0x30,0x30,0x1C,0x00},{0x18,0x18,0x18,0x00,0x18,0x18,0x18,0x00},{0xE0,0x30,0x30,0x1C,0x30,0x30,0xE0,0x00},{0x76,0xDC,0x00,0x00,0x00,0x00,0x00,0x00},{0x00,0x10,0x38,0x6C,0xC6,0xC6,0xFE,0x00},
 };
+// (isi tabelnya angka2 hex doang, gak perlu dihafal — intinya cuma "gambar" tiap huruf dalam bentuk angka)
 
-// Handle-handle (ID) resource OpenGL global (texture, VAO/VBO, shader program)
-unsigned int fontTex,fontVAO,fontVBO2,fontProg,whiteTex; // resource untuk render teks & kotak polos
-unsigned int VAO,VBO,shaderProg,shadowProg;               // resource untuk render objek 3D (cube) & bayangan
-
-// Vertex/fragment shader khusus untuk render teks 2D (HUD) di atas layar
+unsigned int fontTex,fontVAO,fontVBO2,fontProg,whiteTex; // ID2 buat resource OpenGL: texture font, VAO/VBO buat gambar teks, program shader font, texture polos putih (buat gambar kotak/rect)
+unsigned int VAO,VBO,shaderProg,shadowProg;              // ID2 buat resource OpenGL objek 3D utama (kubus), shader utama, shader bayangan
 const char* fontV=R"(#version 330 core
 layout(location=0) in vec2 aPos; layout(location=1) in vec2 aUV; out vec2 vUV; uniform mat4 proj;
 void main(){ vUV=aUV; gl_Position=proj*vec4(aPos,0,1); })";
+// ^ vertex shader khusus buat gambar teks 2D di layar (HUD)
+
 const char* fontF=R"(#version 330 core
 in vec2 vUV; out vec4 C; uniform sampler2D tex; uniform vec4 color;
 void main(){ C=vec4(color.rgb, color.a*texture(tex,vUV).r); })";
+// ^ fragment shader teks: warna teks diambil dari uniform "color", transparansinya ikut bentuk huruf di texture font
 
-// ----------------------------------------------------------------------------
-// initFont(): membangun texture atlas font dari data bitmap FONT8 di atas,
-// lalu menyiapkan VAO/VBO untuk menggambar quad (persegi) yang menampilkan
-// potongan texture tersebut sebagai huruf.
-// ----------------------------------------------------------------------------
-void initFont(){
-    static unsigned char atlas[48][128]={};       // buffer gambar atlas font (128x48 piksel, 1 channel)
-    for(int c=0;c<96;c++){                          // untuk tiap 96 karakter...
-        int col=c%16, row=c/16;                     // hitung posisi kolom & baris karakter di atlas (grid 16 kolom)
-        for(int y=0;y<8;y++){                        // untuk tiap baris piksel (8 baris per karakter)...
-            unsigned char b=FONT8[c][y];             // ambil 1 byte data baris piksel karakter ini
-            for(int x=0;x<8;x++)                     // untuk tiap kolom piksel (8 kolom)...
-                if(b&(0x80>>x))                       // jika bit ke-x menyala...
-                    atlas[row*8+y][col*8+x]=255;       // set piksel jadi putih penuh di atlas
+// =====================================================================================
+void initFont(){                                          // fungsi buat nyiapin texture font & buffer gambar teks (dipanggil sekali di awal)
+    static unsigned char atlas[48][128]={};                // "kanvas" besar tempat nyusun semua huruf jadi satu gambar (atlas)
+    for(int c=0;c<96;c++){                                 // loop semua karakter (96 karakter ASCII yang dipakai)
+        int col=c%16, row=c/16;                            // hitung posisi huruf ini di dalam grid atlas (16 kolom)
+        for(int y=0;y<8;y++){                              // loop tiap baris pixel huruf (8 baris)
+            unsigned char b=FONT8[c][y];                   // ambil data 1 baris pixel huruf dari tabel FONT8
+            for(int x=0;x<8;x++) if(b&(0x80>>x)) atlas[row*8+y][col*8+x]=255; // cek tiap bit, kalau nyala (1) taruh pixel putih (255) di atlas
         }
     }
-    glGenTextures(1,&fontTex); glBindTexture(GL_TEXTURE_2D,fontTex);           // buat & aktifkan texture font
-    glTexImage2D(GL_TEXTURE_2D,0,GL_RED,128,48,0,GL_RED,GL_UNSIGNED_BYTE,atlas); // upload data atlas ke GPU (1 channel merah)
-    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST); glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST); // filter nearest = tegas, tidak blur (cocok untuk font pixel-art)
-    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE); glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE); // jangan diulang di tepi
-    unsigned char w=255;                             // 1 piksel putih polos...
-    glGenTextures(1,&whiteTex); glBindTexture(GL_TEXTURE_2D,whiteTex);          // ...dipakai sebagai texture untuk menggambar kotak/HUD polos
-    glTexImage2D(GL_TEXTURE_2D,0,GL_RED,1,1,0,GL_RED,GL_UNSIGNED_BYTE,&w);
-    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST); glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
-    glGenVertexArrays(1,&fontVAO); glGenBuffers(1,&fontVBO2);                   // siapkan VAO/VBO untuk quad teks
+    glGenTextures(1,&fontTex); glBindTexture(GL_TEXTURE_2D,fontTex); // bikin & aktifin texture buat font
+    glTexImage2D(GL_TEXTURE_2D,0,GL_RED,128,48,0,GL_RED,GL_UNSIGNED_BYTE,atlas); // upload data atlas huruf ke GPU sebagai texture
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST); glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST); // filter NEAREST biar teks tetap tajam/gak blur (pixel-art style)
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE); glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE); // biar texture gak "ngulang" di tepi
+    unsigned char w=255;                                   // siapin 1 pixel putih polos
+    glGenTextures(1,&whiteTex); glBindTexture(GL_TEXTURE_2D,whiteTex); // bikin texture putih 1x1 (dipakai buat gambar kotak/rectangle polos, misal HUD background)
+    glTexImage2D(GL_TEXTURE_2D,0,GL_RED,1,1,0,GL_RED,GL_UNSIGNED_BYTE,&w); // upload si 1 pixel putih tadi
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST); glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST); // filter nearest juga
+    glGenVertexArrays(1,&fontVAO); glGenBuffers(1,&fontVBO2); // bikin VAO+VBO khusus buat gambar quad (persegi) teks/rect
     glBindVertexArray(fontVAO); glBindBuffer(GL_ARRAY_BUFFER,fontVBO2);
-    glBufferData(GL_ARRAY_BUFFER,sizeof(float)*24,NULL,GL_DYNAMIC_DRAW);        // alokasikan buffer kosong (akan diisi ulang tiap gambar quad)
+    glBufferData(GL_ARRAY_BUFFER,sizeof(float)*24,NULL,GL_DYNAMIC_DRAW); // siapin buffer kosong (isinya bakal diupdate tiap gambar quad baru -> makanya DYNAMIC)
     glVertexAttribPointer(0,2,GL_FLOAT,GL_FALSE,4*sizeof(float),(void*)0); glEnableVertexAttribArray(0); // atribut posisi (x,y)
     glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,4*sizeof(float),(void*)(2*sizeof(float))); glEnableVertexAttribArray(1); // atribut UV (koordinat texture)
-    glBindVertexArray(0);
+    glBindVertexArray(0);                                  // lepas binding VAO biar gak ke-utak-atik gak sengaja
 }
 
-// quadDraw(): mengisi 6 vertex (2 segitiga = 1 persegi) dengan posisi & UV
-// tertentu, lalu menggambarnya. Dipakai untuk teks maupun kotak HUD.
-static void quadDraw(float x,float y,float w,float h,float u0,float v0,float u1,float v1){
-    float v[6][4]={{x,y+h,u0,v1},{x,y,u0,v0},{x+w,y,u1,v0},
+static void quadDraw(float x,float y,float w,float h,float u0,float v0,float u1,float v1){ // fungsi buat gambar 1 kotak (quad) di posisi x,y ukuran w,h, dengan koordinat texture u0v0-u1v1
+    float v[6][4]={{x,y+h,u0,v1},{x,y,u0,v0},{x+w,y,u1,v0},           // 6 titik (2 segitiga) buat bentuk 1 persegi
                    {x,y+h,u0,v1},{x+w,y,u1,v0},{x+w,y+h,u1,v1}};
-    glBindVertexArray(fontVAO); glBindBuffer(GL_ARRAY_BUFFER,fontVBO2);
-    glBufferSubData(GL_ARRAY_BUFFER,0,sizeof(v),v);   // update isi buffer dengan 6 vertex quad
-    glDrawArrays(GL_TRIANGLES,0,6);                    // gambar 6 vertex sebagai 2 segitiga
+    glBindVertexArray(fontVAO); glBindBuffer(GL_ARRAY_BUFFER,fontVBO2); // pakai VAO/VBO font
+    glBufferSubData(GL_ARRAY_BUFFER,0,sizeof(v),v); glDrawArrays(GL_TRIANGLES,0,6); // update data quad ke GPU terus gambar 2 segitiga (jadi 1 kotak)
 }
 
-// renderRect(): menggambar kotak polos berwarna (dipakai untuk latar HUD,
-// layar merah saat kena hit, kotak pause/game over, dll)
-void renderRect(float x,float y,float w,float h,float r,float g,float b,float a){
-    glUseProgram(fontProg); glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D,whiteTex); // pakai texture putih polos
+void renderRect(float x,float y,float w,float h,float r,float g,float b,float a){ // gambar kotak polos warna solid (dipake buat background HUD, dsb)
+    glUseProgram(fontProg); glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D,whiteTex); // pakai shader font + texture putih polos
     glUniform1i(glGetUniformLocation(fontProg,"tex"),0);
-    glUniform4f(glGetUniformLocation(fontProg,"color"),r,g,b,a);   // set warna & transparansi kotak
-    quadDraw(x,y,w,h,0,0,1,1);                                       // gambar kotak di posisi (x,y) ukuran (w,h)
+    glUniform4f(glGetUniformLocation(fontProg,"color"),r,g,b,a);          // set warna kotaknya
+    quadDraw(x,y,w,h,0,0,1,1);                                            // gambar kotaknya
 }
 
-// renderText(): menggambar string teks memakai font bitmap, karakter demi karakter
-void renderText(const std::string& s,float x,float y,float sc,float r=1,float g=1,float b=1,float a=1){
-    glUseProgram(fontProg); glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D,fontTex); // pakai texture atlas font
+void renderText(const std::string& s,float x,float y,float sc,float r=1,float g=1,float b=1,float a=1){ // fungsi gambar teks di layar (HUD)
+    glUseProgram(fontProg); glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D,fontTex); // pakai shader font + texture atlas huruf
     glUniform1i(glGetUniformLocation(fontProg,"tex"),0);
-    glUniform4f(glGetUniformLocation(fontProg,"color"),r,g,b,a);   // warna teks
-    for(char c:s){                                                  // untuk tiap karakter dalam string...
-        if(c<32||c>127) c=32;                                        // karakter di luar jangkauan font -> jadikan spasi
-        int idx=c-32, col=idx%16, row=idx/16;                        // cari posisi karakter ini di atlas
-        quadDraw(x,y,8*sc,8*sc, col*8/128.f, row*8/48.f, (col+1)*8/128.f, (row+1)*8/48.f); // gambar 1 huruf
-        x+=8*sc;                                                      // geser posisi x untuk huruf berikutnya
+    glUniform4f(glGetUniformLocation(fontProg,"color"),r,g,b,a);          // warna teksnya
+    for(char c:s){                                                       // loop tiap karakter di string
+        if(c<32||c>127) c=32;                                            // kalau karakter aneh/di luar range, ganti jadi spasi
+        int idx=c-32, col=idx%16, row=idx/16;                            // cari posisi huruf ini di dalam atlas (grid 16 kolom)
+        quadDraw(x,y,8*sc,8*sc, col*8/128.f, row*8/48.f, (col+1)*8/128.f, (row+1)*8/48.f); // gambar 1 huruf sesuai posisi di atlas & skala ukurannya
+        x+=8*sc;                                                         // geser posisi x buat huruf berikutnya
     }
 }
 
-// renderHeart(): menggambar 1 ikon hati (untuk menampilkan nyawa pemain di HUD)
-// dari beberapa kotak kecil yang disusun membentuk bentuk hati piksel.
-void renderHeart(float x,float y,float s,bool filled){
-    float r=filled?.95f:.28f, g=filled?.15f:.22f, b=filled?.18f:.26f; // hati terisi = merah terang, kosong = abu gelap
-    renderRect(x+s,y,s,s,r,g,b,1); renderRect(x+4*s,y,s,s,r,g,b,1);
-    renderRect(x,y+s,6*s,s,r,g,b,1); renderRect(x,y+2*s,6*s,s,r,g,b,1);
-    renderRect(x+s,y+3*s,4*s,s,r,g,b,1); renderRect(x+2*s,y+4*s,2*s,s,r,g,b,1); renderRect(x+3*s,y+5*s,s,s,r,g,b,1);
+void renderHeart(float x,float y,float s,bool filled){                  // gambar 1 icon hati (buat nunjukin nyawa/lives) pake kotak2 kecil
+    float r=filled?.95f:.28f, g=filled?.15f:.22f, b=filled?.18f:.26f;    // kalau "filled"=true warnanya merah cerah (nyawa masih ada), kalau false warnanya gelap/pudar (nyawa hilang)
+    renderRect(x+s,y,s,s,r,g,b,1); renderRect(x+4*s,y,s,s,r,g,b,1);      // gambar 2 "puncak" hati
+    renderRect(x,y+s,6*s,s,r,g,b,1); renderRect(x,y+2*s,6*s,s,r,g,b,1);  // gambar badan tengah hati
+    renderRect(x+s,y+3*s,4*s,s,r,g,b,1); renderRect(x+2*s,y+4*s,2*s,s,r,g,b,1); renderRect(x+3*s,y+5*s,s,s,r,g,b,1); // gambar bagian bawah hati yang meruncing
 }
 
-// Data mentah 36 vertex kubus (6 sisi x 2 segitiga x 3 titik), tiap vertex
-// berisi (posisi x,y,z) + (normal x,y,z). Ini dipakai untuk MENGGAMBAR SEMUA
-// objek 3D di game (pemain, platform, roket, tanah, dll) — semuanya sebenarnya
-// cuma kubus yang di-scale/geser dengan ukuran & posisi berbeda.
+// =====================================================================================
+// ///////////////////////////////// KUBUS (MODEL 3D DASAR) ////////////////////////////
+// Semua objek di game ini (tanah, wall, pemain, roket) dibentuk dari kubus2 yang di-scale
+// =====================================================================================
 float cubeVerts[]={-1,-1,-1,0,0,-1, 1,-1,-1,0,0,-1, 1,1,-1,0,0,-1, 1,1,-1,0,0,-1,-1,1,-1,0,0,-1,-1,-1,-1,0,0,-1, -1,-1,1,0,0,1,   1,-1,1,0,0,1,   1,1,1,0,0,1,   1,1,1,0,0,1,  -1,1,1,0,0,1,  -1,-1,1,0,0,1, -1,1,1,-1,0,0, -1,1,-1,-1,0,0, -1,-1,-1,-1,0,0,-1,-1,-1,-1,0,0,-1,-1,1,-1,0,0,-1,1,1,-1,0,0, 1,1,1,1,0,0,  1,1,-1,1,0,0,   1,-1,-1,1,0,0, 1,-1,-1,1,0,0, 1,-1,1,1,0,0,   1,1,1,1,0,0, -1,-1,-1,0,-1,0, 1,-1,-1,0,-1,0, 1,-1,1,0,-1,0, 1,-1,1,0,-1,0, -1,-1,1,0,-1,0, -1,-1,-1,0,-1,0, -1,1,-1,0,1,0,  1,1,-1,0,1,0,   1,1,1,0,1,0,   1,1,1,0,1,0, -1,1,1,0,1,0,  -1,1,-1,0,1,0,};
+// ^ data mentah 36 titik (6 sisi x 2 segitiga x 3 titik) buat bentuk 1 kubus, tiap titik = posisi (x,y,z) + arah normal (buat pencahayaan)
 
-// makeShader(): compile vertex shader + fragment shader, lalu link jadi
-// satu "program" shader yang siap dipakai untuk menggambar.
-unsigned int makeShader(const char* vs,const char* fs){
-    auto compile=[](unsigned int t,const char* src){
-        unsigned int s=glCreateShader(t);            // buat objek shader kosong bertipe t (vertex/fragment)
-        glShaderSource(s,1,&src,NULL); glCompileShader(s); // masukkan source code & compile
-        int ok; glGetShaderiv(s,GL_COMPILE_STATUS,&ok);    // cek apakah compile berhasil
-        if(!ok){char log[512];glGetShaderInfoLog(s,512,NULL,log);std::cerr<<log;} // kalau gagal, print pesan error
+unsigned int makeShader(const char* vs,const char* fs){                  // fungsi buat compile & link shader jadi 1 "program" yang siap dipakai
+    auto compile=[](unsigned int t,const char* src){                     // fungsi kecil di dalam buat compile 1 shader (vertex/fragment)
+        unsigned int s=glCreateShader(t);                                // bikin objek shader kosong
+        glShaderSource(s,1,&src,NULL); glCompileShader(s);               // masukin source code-nya terus di-compile
+        int ok; glGetShaderiv(s,GL_COMPILE_STATUS,&ok);                  // cek apakah compile-nya sukses
+        if(!ok){char log[512];glGetShaderInfoLog(s,512,NULL,log);std::cerr<<log;} // kalau gagal, print error-nya ke console
         return s;
     };
-    unsigned int v=compile(GL_VERTEX_SHADER,vs), f=compile(GL_FRAGMENT_SHADER,fs), p=glCreateProgram(); // compile keduanya, buat program
-    glAttachShader(p,v); glAttachShader(p,f); glLinkProgram(p); // gabungkan vertex+fragment shader jadi 1 program
-    glDeleteShader(v); glDeleteShader(f);                        // shader individu sudah tidak perlu lagi setelah di-link
-    return p;                                                     // kembalikan ID program shader
+    unsigned int v=compile(GL_VERTEX_SHADER,vs), f=compile(GL_FRAGMENT_SHADER,fs), p=glCreateProgram(); // compile vertex & fragment shader, bikin program kosong
+    glAttachShader(p,v); glAttachShader(p,f); glLinkProgram(p);          // gabungin dua shader itu jadi 1 program & link
+    glDeleteShader(v); glDeleteShader(f);                                // hapus shader individual (udah gak kepake abis di-link)
+    return p;                                                           // balikin ID program shader yang siap dipakai
 }
 
-// setUniforms(): kirim matriks projection & view (kamera) ke shader tertentu,
-// dan aktifkan VAO kubus supaya siap digambar.
-void setUniforms(unsigned int prog,glm::mat4& proj,glm::mat4& view){
-    glUseProgram(prog); glBindVertexArray(VAO);
-    glUniformMatrix4fv(glGetUniformLocation(prog,"projection"),1,GL_FALSE,glm::value_ptr(proj));
-    glUniformMatrix4fv(glGetUniformLocation(prog,"view"),1,GL_FALSE,glm::value_ptr(view));
+void setUniforms(unsigned int prog,glm::mat4& proj,glm::mat4& view){    // fungsi buat kirim matrix proyeksi & kamera ke shader
+    glUseProgram(prog); glBindVertexArray(VAO);                          // aktifin shader program & VAO kubus
+    glUniformMatrix4fv(glGetUniformLocation(prog,"projection"),1,GL_FALSE,glm::value_ptr(proj)); // kirim matrix projection (buat efek perspektif 3D)
+    glUniformMatrix4fv(glGetUniformLocation(prog,"view"),1,GL_FALSE,glm::value_ptr(view));       // kirim matrix view (posisi & arah kamera)
 }
 
-// drawCube(): menggambar SATU kubus di posisi `pos`, dengan ukuran `sc`
-// (scale per-sumbu), warna `col`, dan transparansi `a`.
-// Fungsi inilah yang dipakai berulang-ulang untuk membentuk roket, pemain,
-// platform, tanah, dsb — masing-masing bagian tubuh/objek = 1 pemanggilan drawCube.
-void drawCube(unsigned int prog,glm::vec3 pos,glm::vec3 sc,glm::vec3 col,float a=1){
-    glm::mat4 m=glm::scale(glm::translate(glm::mat4(1),pos),sc); // matriks model = geser ke `pos`, lalu skala sebesar `sc`
-    glUniformMatrix4fv(glGetUniformLocation(prog,"model"),1,GL_FALSE,glm::value_ptr(m)); // kirim matriks model ke shader
-    glUniform3fv(glGetUniformLocation(prog,"objectColor"),1,glm::value_ptr(col));         // kirim warna objek
-    glUniform1f(glGetUniformLocation(prog,"alpha"),a);                                     // kirim transparansi
-    glDrawArrays(GL_TRIANGLES,0,36);                                                        // gambar 36 vertex (kubus) sebagai segitiga
+void drawCube(unsigned int prog,glm::vec3 pos,glm::vec3 sc,glm::vec3 col,float a=1){ // fungsi utama buat gambar 1 kubus di posisi "pos", ukuran "sc", warna "col", transparansi "a"
+    glm::mat4 m=glm::scale(glm::translate(glm::mat4(1),pos),sc);          // bikin matrix model: pindahin (translate) ke posisi lalu di-scale sesuai ukuran
+    glUniformMatrix4fv(glGetUniformLocation(prog,"model"),1,GL_FALSE,glm::value_ptr(m)); // kirim matrix model ke shader
+    glUniform3fv(glGetUniformLocation(prog,"objectColor"),1,glm::value_ptr(col));        // kirim warna objek ke shader
+    glUniform1f(glGetUniformLocation(prog,"alpha"),a);                    // kirim nilai transparansi
+    glDrawArrays(GL_TRIANGLES,0,36);                                      // gambar kubusnya (36 titik = 12 segitiga = 6 sisi kubus)
 }
 
-// drawLimb(): mirip drawCube, tapi menambahkan ROTASI di sekitar titik pivot
-// (dipakai untuk menggambar tangan/kaki pemain yang bisa berayun/berputar)
-void drawLimb(unsigned int prog,glm::vec3 pivot,float angle,glm::vec3 offset,glm::vec3 sc,glm::vec3 col){
-    glm::mat4 m=glm::translate(glm::mat4(1),pivot);                 // pindah ke titik pivot (sendi, misal bahu/pangkal paha)
-    m=glm::rotate(m,glm::radians(angle),glm::vec3(1,0,0));          // putar sebesar `angle` derajat di sumbu X
-    m=glm::translate(m,offset);                                     // geser lagi sesuai offset (supaya limb menjuntai dari pivot)
-    m=glm::scale(m,sc);                                             // skalakan ukuran limb
-    glUniformMatrix4fv(glGetUniformLocation(prog,"model"),1,GL_FALSE,glm::value_ptr(m));
-    glUniform3fv(glGetUniformLocation(prog,"objectColor"),1,glm::value_ptr(col));
-    glUniform1f(glGetUniformLocation(prog,"alpha"),1);
-    glDrawArrays(GL_TRIANGLES,0,36);
+// ///////////////////////////////// KARAKTER (PLAYER) - GAMBAR //////////////////////////
+void drawPlayer(unsigned int prog,glm::vec3 base,float s){                // fungsi buat gambar karakter pemain, disusun dari beberapa kubus kecil (kayak lego)
+    drawCube(prog,base+glm::vec3(-s*.2f,s*.15f,0),{s*.16f,s*.3f,s*.16f},COL_PLAYER_LIMB);   // kaki kiri
+    drawCube(prog,base+glm::vec3( s*.2f,s*.15f,0),{s*.16f,s*.3f,s*.16f},COL_PLAYER_LIMB);   // kaki kanan
+    drawCube(prog,base+glm::vec3(0,s*.85f,0),{s*.36f,s*.38f,s*.2f},COL_PLAYER_BODY);        // badan
+    drawCube(prog,base+glm::vec3(-s*.52f,s*.71f,0),{s*.14f,s*.26f,s*.14f},COL_PLAYER_LIMB); // tangan kiri
+    drawCube(prog,base+glm::vec3( s*.52f,s*.71f,0),{s*.14f,s*.26f,s*.14f},COL_PLAYER_LIMB); // tangan kanan
+    drawCube(prog,base+glm::vec3(0,s*1.52f,0),{s*.33f,s*.3f,s*.26f},COL_PLAYER_SKIN);       // kepala
+    drawCube(prog,base+glm::vec3(-s*.13f,s*1.59f,s*.30f),{s*.07f,s*.07f,s*.04f},COL_EYE_WHITE); // putih mata kiri
+    drawCube(prog,base+glm::vec3(-s*.13f,s*1.59f,s*.35f),{s*.04f,s*.04f,s*.03f},COL_EYE_BLACK); // bola mata kiri
+    drawCube(prog,base+glm::vec3( s*.13f,s*1.59f,s*.30f),{s*.07f,s*.07f,s*.04f},COL_EYE_WHITE); // putih mata kanan
+    drawCube(prog,base+glm::vec3( s*.13f,s*1.59f,s*.35f),{s*.04f,s*.04f,s*.03f},COL_EYE_BLACK); // bola mata kanan
+}
+// intinya: karakter cuma tumpukan kubus kecil (kayak Minecraft mini), posisinya relatif dari "base" (posisi kaki/pijakan)
+
+// ///////////////////////////////// WALL (PLATFORM) - LOGIKA ///////////////////////////
+void spawnWall(bool forceSame=false,float delay=0){                       // fungsi buat munculin 1 wall/platform baru
+    Wall w;                                                               // bikin data wall baru
+    w.id=wallsPassed+1; w.height=0.16f;                                   // id-nya berdasarkan skor sekarang, tinggi wall tetap
+    w.passed=w.playerOn=w.isFrozen=false; w.alive=true;                   // status awal: belum dilewatin, belum ada yang injek, belum beku, dan aktif
+    w.waitingDelay=(delay>0); w.delayTimer=delay;                         // kalau ada delay, wall nunggu dulu sebelum muncul beneran
+    w.width=std::max(6.f-(wallsPassed/5)*0.55f,1.5f);                     // lebar wall makin lama makin kecil (makin susah) tapi ada batas minimal
+    bool right=forceSame?!spawnFromRight:spawnFromRight;                  // tentuin wall muncul dari kanan atau kiri
+    w.speedSign=right?-1.f:1.f;                                           // arah gerak: kalau dari kanan berarti geraknya ke kiri (negatif), dst
+    w.x=w.waitingDelay?999.f:(right?16.f:-16.f);                          // posisi awal x: kalau masih nunggu delay taruh jauh (999=gak keliatan), kalau enggak taruh di tepi layar
+    if(!forceSame) spawnFromRight=!spawnFromRight;                        // gantian arah munculnya wall berikutnya (biar variatif kiri-kanan)
+    w.y=player.standingY+0.75f;                                          // ketinggian wall = posisi pijakan pemain sekarang + jarak lompat standar
+    walls.push_back(w);                                                  // masukin wall baru ini ke daftar walls
 }
 
-// drawPlayer(): menggambar karakter pemain lengkap dari beberapa kubus:
-// 2 kaki, badan, 2 tangan, kepala, dan 2 pasang mata (putih+pupil).
-void drawPlayer(unsigned int prog,glm::vec3 base,float s,float leg,float arm){
-    drawLimb(prog,base+glm::vec3(-s*.2f,s*.3f,0), leg,{0,-s*.3f,0},{s*.16f,s*.3f,s*.16f},COL_PLAYER_LIMB); // kaki kiri
-    drawLimb(prog,base+glm::vec3( s*.2f,s*.3f,0),-leg,{0,-s*.3f,0},{s*.16f,s*.3f,s*.16f},COL_PLAYER_LIMB); // kaki kanan (ayunan berlawanan)
-    drawCube(prog,base+glm::vec3(0,s*.85f,0),{s*.36f,s*.38f,s*.2f},COL_PLAYER_BODY);                        // badan
-    drawLimb(prog,base+glm::vec3(-s*.52f,s*.95f,0),-arm,{0,-s*.24f,0},{s*.14f,s*.26f,s*.14f},COL_PLAYER_LIMB); // tangan kiri
-    drawLimb(prog,base+glm::vec3( s*.52f,s*.95f,0), arm,{0,-s*.24f,0},{s*.14f,s*.26f,s*.14f},COL_PLAYER_LIMB); // tangan kanan
-    drawCube(prog,base+glm::vec3(0,s*1.52f,0),{s*.33f,s*.3f,s*.26f},COL_PLAYER_SKIN);                        // kepala
-    drawCube(prog,base+glm::vec3(-s*.13f,s*1.59f,s*.30f),{s*.07f,s*.07f,s*.04f},COL_EYE_WHITE);              // mata kiri (putih)
-    drawCube(prog,base+glm::vec3(-s*.13f,s*1.59f,s*.35f),{s*.04f,s*.04f,s*.03f},COL_EYE_BLACK);              // mata kiri (pupil, sedikit lebih depan)
-    drawCube(prog,base+glm::vec3( s*.13f,s*1.59f,s*.30f),{s*.07f,s*.07f,s*.04f},COL_EYE_WHITE);              // mata kanan (putih)
-    drawCube(prog,base+glm::vec3( s*.13f,s*1.59f,s*.35f),{s*.04f,s*.04f,s*.03f},COL_EYE_BLACK);              // mata kanan (pupil)
+void resetGame(){                                                        // fungsi buat reset semua data game ke kondisi awal (dipanggil pas mulai/restart)
+    player={}; walls.clear(); rockets.clear();                           // reset posisi pemain, kosongin semua wall & roket
+    wallsPassed=0; wallSpeed=5.5f; gameTime=0;                           // reset skor, kecepatan wall, & waktu main
+    gameState=PLAYING; playerLives=5;                                    // set status main lagi & nyawa full (5)
+    hitCooldown=0; spawnFromRight=false; lastMilestone=0;                // reset cooldown kena hit, arah spawn, & milestone skor
+    camPos.y=2.5f; camTargetY=2.5f;                                      // reset posisi kamera ke awal
+    spawnWall(false,1.2f);                                               // munculin wall pertama (dengan delay dikit biar gak instan)
 }
 
-// spawnWall(): membuat 1 platform baru dan memasukkannya ke `walls`.
-void spawnWall(bool forceSame=false,float delay=0){
-    Wall w;
-    w.id=wallsPassed+1; w.height=0.16f;                                   // nomor urut & tinggi tetap
-    w.passed=w.playerOn=w.isFrozen=false; w.alive=true;                   // status awal: belum diinjak, belum beku, aktif
-    w.waitingDelay=(delay>0); w.delayTimer=delay;                          // jika delay>0, platform menunggu dulu sebelum tampil
-    w.width=std::max(6.f-(wallsPassed/10)*0.55f,1.5f);                     // makin tinggi skor, platform makin sempit (lebih sulit)
-    bool right=forceSame?!spawnFromRight:spawnFromRight;                   // tentukan arah datang platform ini
-    w.speedSign=right?-1.f:1.f;                                            // jika datang dari kanan, bergerak ke kiri (-1), dan sebaliknya
-    w.x=w.waitingDelay?999.f:(right?16.f:-16.f);                           // posisi awal: di luar layar (kanan/kiri), atau "parkir" di 999 kalau masih delay
-    if(!forceSame) spawnFromRight=!spawnFromRight;                         // bergantian kiri-kanan untuk spawn normal
-    w.y=player.standingY+0.75f;                                            // tinggi platform = tinggi pijakan pemain saat ini + naik sedikit
-    walls.push_back(w);                                                    // masukkan ke daftar platform aktif
-}
-
-// resetGame(): mengembalikan semua variabel game ke kondisi awal (dipanggil
-// saat mulai main / tekan tombol R restart).
-void resetGame(){
-    player={}; walls.clear(); rockets.clear();     // reset posisi pemain, kosongkan semua platform & ROKET
-    wallsPassed=0; wallSpeed=5.5f; gameTime=0;      // reset skor, kecepatan platform, waktu main
-    gameState=PLAYING; playerLives=5;               // kembali ke status bermain, nyawa penuh
-    hitCooldown=0; spawnFromRight=false; lastMilestone=0; // reset cooldown, arah spawn, milestone roket
-    camPos.y=2.5f; camTargetY=2.5f;                 // reset posisi kamera
-    spawnWall(false,1.2f);                          // buat platform pertama (muncul setelah delay 1.2 detik)
-}
-
-static bool g_backToMenu=false;   // flag: apakah pemain menekan M untuk kembali ke menu
-static bool keys[512]={};         // status tiap tombol keyboard: true = sedang ditekan
-
-// key_callback(): dipanggil GLFW setiap ada event keyboard (tekan/lepas tombol)
-void key_callback(GLFWwindow* win,int key,int,int action,int){
-    if(key>=0&&key<512){                              // pastikan kode tombol valid (dalam batas array `keys`)
-        if(action==GLFW_PRESS)   keys[key]=true;        // tombol ditekan -> tandai true
-        if(action==GLFW_RELEASE) keys[key]=false;        // tombol dilepas -> tandai false
+// =====================================================================================
+// //////////////////////////////////// INPUT & KONTROL /////////////////////////////////
+// =====================================================================================
+static bool g_backToMenu=false;                                          // penanda global: pemain minta balik ke menu (tekan M)
+static bool keys[512]={};                                                // array status semua tombol keyboard (true=lagi ditekan)
+void key_callback(GLFWwindow* win,int key,int,int action,int){          // fungsi ini dipanggil otomatis tiap ada event keyboard
+    if(key>=0&&key<512){                                                 // pastiin kode key-nya valid
+        if(action==GLFW_PRESS)   keys[key]=true;                         // tombol ditekan -> set true
+        if(action==GLFW_RELEASE) keys[key]=false;                        // tombol dilepas -> set false
     }
-    if(action!=GLFW_PRESS) return;                     // sisa kode di bawah hanya untuk event "baru ditekan" (bukan tahan/lepas)
-    if((key==GLFW_KEY_SPACE||key==GLFW_KEY_UP||key==GLFW_KEY_W)&&player.onGround&&gameState==PLAYING){
-        player.velY=JUMP_FORCE; player.onGround=false;   // SPACE/UP/W saat menapak & sedang main -> lompat
+    if(action!=GLFW_PRESS) return;                                       // sisa kode di bawah cuma jalan pas tombol BARU ditekan (bukan ditahan terus atau dilepas)
+    if((key==GLFW_KEY_SPACE||key==GLFW_KEY_UP||key==GLFW_KEY_W)&&player.onGround&&gameState==PLAYING){ // kalau tekan SPACE/UP/W, lagi berdiri di tanah, & lagi main
+        player.velY=JUMP_FORCE; player.onGround=false;                   // kasih kecepatan lompat ke atas & tandain lagi di udara
     }
-    if(key==GLFW_KEY_ESCAPE||key==GLFW_KEY_P) gameState=gameState==PLAYING?PAUSED:(gameState==PAUSED?PLAYING:gameState); // ESC/P -> toggle pause
-    if(key==GLFW_KEY_R) resetGame();                    // R -> restart game
-    if(key==GLFW_KEY_M){ g_backToMenu=true; glfwSetWindowShouldClose(win,GLFW_TRUE); } // M -> tutup window game, kembali ke menu
+    if(key==GLFW_KEY_ESCAPE||key==GLFW_KEY_P) gameState=gameState==PLAYING?PAUSED:(gameState==PAUSED?PLAYING:gameState); // ESC/P buat toggle pause <-> main (kalau lagi game over, gak ngaruh)
+    if(key==GLFW_KEY_R) resetGame();                                     // tombol R buat restart game dari awal
+    if(key==GLFW_KEY_M){ g_backToMenu=true; glfwSetWindowShouldClose(win,GLFW_TRUE); } // tombol M buat balik ke menu (nutup window game)
+}
+void framebuffer_size_callback(GLFWwindow*,int w,int h){ glViewport(0,0,w,h); } // dipanggil kalau ukuran window berubah, biar area gambar OpenGL ikut nyesuain
+
+// ///////////////////////////////// SISTEM NYAWA (DAMAGE) //////////////////////////////
+void takeDamage(){                                                       // fungsi dipanggil pas pemain kena serangan (ketabrak wall/roket)
+    playerLives--; hitCooldown=1.8f;                                     // kurangin 1 nyawa, kasih jeda kebal 1.8 detik biar gak kena damage beruntun
+    if(playerLives<=0){ gameState=GAME_OVER; return; }                   // kalau nyawa habis, langsung ganti status jadi GAME_OVER
+    player.pos={0,player.standingY,0};                                   // kalau masih ada nyawa, taruh ulang pemain di tengah pada ketinggian terakhir dia berdiri
+    player.velY=0; player.onGround=true;                                 // reset kecepatan jatuh & anggap lagi berdiri
 }
 
-// framebuffer_size_callback(): dipanggil saat ukuran window berubah, supaya
-// area render OpenGL (viewport) disesuaikan.
-void framebuffer_size_callback(GLFWwindow*,int w,int h){ glViewport(0,0,w,h); }
-
-// takeDamage(): dipanggil setiap pemain terkena tabrakan (dari platform yang
-// menabrak dari samping, ATAU dari roket). Mengurangi nyawa, memberi waktu
-// kebal (hitCooldown), dan memindahkan pemain kembali ke titik aman.
-void takeDamage(){
-    playerLives--; hitCooldown=1.8f;                   // kurangi nyawa, beri 1.8 detik waktu kebal (tidak bisa kena damage lagi)
-    if(playerLives<=0){ gameState=GAME_OVER; return; }  // nyawa habis -> game over, berhenti di sini
-    player.pos={0,player.standingY,0};                  // pemain "dilempar balik" ke tengah, di ketinggian pijakan terakhir
-    player.velY=0; player.onGround=true;                // reset kecepatan jatuh & anggap kembali menapak
-}
-
-// ----------------------------------------------------------------------------
-// runGame(): FUNGSI UTAMA GAME LOOP. Menyiapkan window OpenGL, shader, lalu
-// menjalankan loop update+render sampai window ditutup / kembali ke menu.
-// ----------------------------------------------------------------------------
+// =====================================================================================
+// //////////////////////////////////// FUNGSI UTAMA GAME ///////////////////////////////
+// runGame() ini isinya: setup window OpenGL, terus GAME LOOP (jalan terus tiap frame)
+// sampai window ditutup atau pemain balik ke menu
+// =====================================================================================
 bool runGame(){
-    g_backToMenu=false; lastFrame=0;                    // reset flag & timer sebelum mulai
-    glfwInit();                                          // inisialisasi GLFW
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR,3); glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR,3); // minta OpenGL versi 3.3
-    glfwWindowHint(GLFW_OPENGL_PROFILE,GLFW_OPENGL_CORE_PROFILE);  // pakai core profile (tanpa fitur lama/deprecated)
-    GLFWwindow* win=glfwCreateWindow(SCR_W,SCR_H,"Sylvan Odyssey",NULL,NULL); // buat window game
+    g_backToMenu=false; lastFrame=0;                                     // reset penanda balik menu & waktu frame terakhir
+    glfwInit();                                                          // inisialisasi library GLFW
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR,3); glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR,3); // minta versi OpenGL 3.3
+    glfwWindowHint(GLFW_OPENGL_PROFILE,GLFW_OPENGL_CORE_PROFILE);        // pakai profile "core" (modern OpenGL, gak pake fungsi lama/deprecated)
+    GLFWwindow* win=glfwCreateWindow(SCR_W,SCR_H,"Sylvan Odyssey",NULL,NULL); // bikin window game-nya
 #if defined(_WIN32)||defined(_WIN64)
-    { int sw=GetSystemMetrics(SM_CXSCREEN),sh=GetSystemMetrics(SM_CYSCREEN); // di Windows, hitung ukuran layar
-      glfwSetWindowPos(win,(sw-SCR_W)/2,(sh-SCR_H)/2); }                     // lalu posisikan window di tengah layar
+    { int sw=GetSystemMetrics(SM_CXSCREEN),sh=GetSystemMetrics(SM_CYSCREEN); // (khusus windows) ambil ukuran layar
+      glfwSetWindowPos(win,(sw-SCR_W)/2,(sh-SCR_H)/2); }                 // posisiin window di tengah layar
 #endif
-    glfwMakeContextCurrent(win);                          // aktifkan context OpenGL window ini
-    glfwSetFramebufferSizeCallback(win,framebuffer_size_callback); // daftarkan callback resize
-    glfwSetKeyCallback(win,key_callback);                  // daftarkan callback keyboard
-    gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);    // load semua fungsi OpenGL lewat GLAD
-    glEnable(GL_DEPTH_TEST); glEnable(GL_BLEND);           // aktifkan depth test (objek dekat menutupi jauh) & transparansi
-    glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);      // aturan pencampuran warna transparan standar
+    glfwMakeContextCurrent(win);                                        // aktifin context OpenGL buat window ini
+    glfwSetFramebufferSizeCallback(win,framebuffer_size_callback);      // daftarin fungsi callback kalau window di-resize
+    glfwSetKeyCallback(win,key_callback);                               // daftarin fungsi callback buat input keyboard
+    gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);                 // load semua fungsi OpenGL lewat GLAD
+    glEnable(GL_DEPTH_TEST); glEnable(GL_BLEND);                        // aktifin depth test (objek dekat nutupin objek jauh) & blending (buat transparansi)
+    glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);                   // atur cara blending transparansi standar
 
-    shaderProg=makeShader(vertSrc,fragSrc);                // compile shader utama (untuk objek 3D bertekstur cahaya)
-    shadowProg=makeShader(vertSrc,shadowFragSrc);          // compile shader bayangan
-    fontProg=makeShader(fontV,fontF);                      // compile shader teks/HUD
-    initFont();                                             // siapkan texture font & buffer quad
-
-    glGenVertexArrays(1,&VAO); glGenBuffers(1,&VBO);        // buat VAO/VBO untuk data kubus
+    // ------------------- SETUP SHADER & BUFFER (sekali di awal) -------------------
+    shaderProg=makeShader(vertSrc,fragSrc);                              // compile shader utama (buat objek 3D biasa)
+    shadowProg=makeShader(vertSrc,shadowFragSrc);                        // compile shader bayangan
+    fontProg=makeShader(fontV,fontF);                                    // compile shader font/teks
+    initFont();                                                         // siapin texture font & buffer teks
+    glGenVertexArrays(1,&VAO); glGenBuffers(1,&VBO);                    // bikin VAO+VBO buat data kubus
     glBindVertexArray(VAO); glBindBuffer(GL_ARRAY_BUFFER,VBO);
-    glBufferData(GL_ARRAY_BUFFER,sizeof(cubeVerts),cubeVerts,GL_STATIC_DRAW); // upload data 36 vertex kubus ke GPU (statis, tidak berubah)
-    glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,6*sizeof(float),(void*)0); glEnableVertexAttribArray(0); // atribut posisi (3 float)
-    glVertexAttribPointer(1,3,GL_FLOAT,GL_FALSE,6*sizeof(float),(void*)(3*sizeof(float))); glEnableVertexAttribArray(1); // atribut normal (3 float)
+    glBufferData(GL_ARRAY_BUFFER,sizeof(cubeVerts),cubeVerts,GL_STATIC_DRAW); // upload data kubus ke GPU (STATIC karena datanya gak berubah2)
+    glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,6*sizeof(float),(void*)0); glEnableVertexAttribArray(0); // atribut posisi vertex (x,y,z)
+    glVertexAttribPointer(1,3,GL_FLOAT,GL_FALSE,6*sizeof(float),(void*)(3*sizeof(float))); glEnableVertexAttribArray(1); // atribut normal (buat pencahayaan)
+    resetGame();                                                        // reset/siapin kondisi awal game (posisi pemain, wall pertama, dll)
 
-    resetGame();                                            // mulai kondisi game dari awal
+    // ============================= GAME LOOP (INTI GAME) =============================
+    while(!glfwWindowShouldClose(win)){                                  // ulang terus selama window belum ditutup
+        float now=(float)glfwGetTime();                                  // ambil waktu sekarang
+        dt=std::min(now-lastFrame,0.05f); lastFrame=now;                 // hitung delta time (jeda antar frame), dibatasin max 0.05 detik biar gak lompat jauh kalau lag
+        if(hitCooldown>0) hitCooldown-=dt;                               // kurangin cooldown kebal tiap frame
 
-    // ============================= GAME LOOP =============================
-    while(!glfwWindowShouldClose(win)){
-        float now=(float)glfwGetTime();                     // waktu sekarang sejak GLFW dimulai
-        dt=std::min(now-lastFrame,0.05f); lastFrame=now;     // delta time, dibatasi maksimal 0.05 detik (anti lonjakan lag)
-        if(hitCooldown>0) hitCooldown-=dt;                   // kurangi waktu kebal tiap frame
-
+        // ------------------------- LOGIKA GAME (cuma jalan pas PLAYING) -------------------------
         if(gameState==PLAYING){
-            // --- UPDATE PEMAIN ---
-            gameTime+=dt; player.animTimer+=dt;               // tambah waktu main & timer animasi
-            player.velY+=GRAVITY*dt; player.pos.y+=player.velY*dt; // terapkan gravitasi lalu update posisi Y
-            if(keys[GLFW_KEY_A]||keys[GLFW_KEY_LEFT])  player.pos.x-=PSPEED*dt; // gerak kiri
-            if(keys[GLFW_KEY_D]||keys[GLFW_KEY_RIGHT]) player.pos.x+=PSPEED*dt; // gerak kanan
-            player.pos.x=std::max(-PBOUND,std::min(PBOUND,player.pos.x)); // batasi posisi X agar tidak keluar arena
+            gameTime+=dt;                                                // tambahin total waktu main
+            player.velY+=GRAVITY*dt; player.pos.y+=player.velY*dt;       // terapin gravitasi ke kecepatan vertikal, terus update posisi y pemain (ini rumus fisika dasar gerak jatuh)
 
-            bool onGnd=false; float floor=GROUND_Y;            // asumsikan belum menapak, lantai default = tanah
-            if(player.pos.y<=GROUND_Y){ player.pos.y=GROUND_Y; player.velY=0; onGnd=true; } // kalau jatuh ke tanah, berhenti di situ
+            // ///////////////////////// GERAK KIRI/KANAN PEMAIN /////////////////////////
+            if(keys[GLFW_KEY_A]||keys[GLFW_KEY_LEFT])  player.pos.x-=PSPEED*dt; // tombol A/kiri -> gerak ke kiri
+            if(keys[GLFW_KEY_D]||keys[GLFW_KEY_RIGHT]) player.pos.x+=PSPEED*dt; // tombol D/kanan -> gerak ke kanan
+            player.pos.x=std::max(-PBOUND,std::min(PBOUND,player.pos.x));       // batesin posisi x biar pemain gak keluar area main
 
-            // --- CEK TABRAKAN DENGAN PLATFORM (WALL) ---
-            bool nextSpawn=false;
-            std::vector<Wall> pending;                          // platform baru yang akan ditambahkan setelah loop (spawn ulang setelah menabrak)
-            for(auto& w:walls){
-                if(!w.alive||w.waitingDelay) continue;            // lewati platform yang tidak aktif/masih menunggu
-                if(fabs(player.pos.x-w.x)>=PHW+w.width) continue; // lewati kalau posisi X jauh (tidak mungkin bersentuhan)
-                float foot=player.pos.y, head=player.pos.y+PH;    // titik kaki & kepala pemain
-                float top=w.y+w.height, bot=w.y-w.height;         // sisi atas & bawah platform
-                if(player.velY<=0&&foot>=top-0.35f&&foot<=top+0.15f){ // pemain sedang turun & kaki dekat sisi atas platform -> "mendarat"
-                    if(!w.isFrozen&&!w.passed){
-                        w.isFrozen=w.passed=true; wallsPassed++; nextSpawn=true; // platform baru diinjak pertama kali -> tambah skor, beku, minta spawn platform baru
-                        player.pos.y=top; player.velY=0; onGnd=true; floor=top; w.playerOn=true;
+            bool onGnd=false; float floor=GROUND_Y;                     // penanda sementara: apakah pemain lagi di atas sesuatu, dan ketinggian pijakannya
+            if(player.pos.y<=GROUND_Y){ player.pos.y=GROUND_Y; player.velY=0; onGnd=true; } // kalau pemain nyampe lantai dasar, berhentiin jatuhnya di situ
+
+            // ///////////////////////// CEK TABRAKAN DENGAN WALL /////////////////////////
+            bool nextSpawn=false;                                        // penanda: perlu munculin wall baru gak abis ini?
+            std::vector<Wall> pending;                                   // wall2 baru yang bakal ditambahin setelah loop (gak boleh nambah pas lagi looping walls)
+            for(auto& w:walls){                                          // cek satu-satu wall yang ada
+                if(!w.alive||w.waitingDelay) continue;                   // skip kalau wall udah gak aktif atau masih nunggu delay
+                if(fabs(player.pos.x-w.x)>=PHW+w.width) continue;        // skip kalau posisi x pemain masih jauh dari wall (belum mungkin nabrak)
+                float foot=player.pos.y, head=player.pos.y+PH;           // hitung posisi kaki & kepala pemain
+                float top=w.y+w.height, bot=w.y-w.height;                // hitung sisi atas & bawah wall
+                if(player.velY<=0&&foot>=top-0.35f&&foot<=top+0.15f){    // kalau pemain lagi turun/jatuh & kakinya pas ketemu sisi atas wall (mendarat)
+                    if(!w.isFrozen&&!w.passed){                          // kalau wall ini belum pernah diinjek sebelumnya -> INI PENDARATAN PERTAMA (dapat skor!)
+                        w.isFrozen=w.passed=true; wallsPassed++; nextSpawn=true; // tandain wall beku & udah dilewatin, skor nambah 1, tandain perlu spawn wall baru
+                        player.pos.y=top; player.velY=0; onGnd=true; floor=top; w.playerOn=true; // taruh pemain berdiri pas di atas wall
                     }
-                    else if(w.passed&&top<player.standingY-0.1f&&hitCooldown<=0) takeDamage(); // platform lama yang lebih rendah dari pijakan -> dianggap tabrakan, kena damage
-                    else{ player.pos.y=top; player.velY=0; onGnd=true; floor=top; w.playerOn=true; } // kondisi lain -> tetap berdiri di atasnya
+                    else if(w.passed&&top<player.standingY-0.1f&&hitCooldown<=0) takeDamage(); // kalau wall ini di BAWAH posisi berdiri terakhir pemain (berarti ketabrak dari atas turun ke wall lama) -> kena damage
+                    else{ player.pos.y=top; player.velY=0; onGnd=true; floor=top; w.playerOn=true; } // selain itu ya pemain berdiri normal di atas wall
                 }
-                else if(!w.isFrozen&&!w.passed&&hitCooldown<=0&&foot<top-0.15f&&head>bot+0.15f){
-                    // pemain tertabrak platform dari SAMPING (badan menembus area platform, bukan mendarat di atas)
-                    w.isFrozen=true; w.alive=false;                 // platform ini "hancur" (dihapus)
-                    Wall rep=w;                                      // buat salinan platform untuk di-spawn ulang nanti
+                else if(!w.isFrozen&&!w.passed&&hitCooldown<=0&&foot<top-0.15f&&head>bot+0.15f){ // kalau pemain nabrak wall dari SAMPING (badan pemain nyenggol sisi wall, bukan mendarat di atasnya)
+                    w.isFrozen=true; w.alive=false;                       // wall ini dianggap "meledak"/berhenti & dihapus
+                    Wall rep=w;                                          // bikin wall pengganti (respawn) berdasarkan data wall yang tadi
                     rep.passed=rep.playerOn=rep.isFrozen=false;
-                    rep.alive=true; rep.waitingDelay=true; rep.delayTimer=1.f; rep.x=999.f; // parkir dulu 1 detik sebelum muncul lagi
-                    pending.push_back(rep);
-                    for(auto& fw:walls) if(fw.alive&&!fw.isFrozen&&!fw.waitingDelay) fw.isFrozen=true; // bekukan semua platform lain sesaat (efek "jeda" saat kena hit)
-                    takeDamage();                                    // pemain kena damage
+                    rep.alive=true; rep.waitingDelay=true; rep.delayTimer=1.f; rep.x=999.f; // wall penggantinya nunggu delay 1 detik dulu sebelum muncul lagi
+                    pending.push_back(rep);                              // simpen dulu di "pending" (baru ditambah ke walls abis loop ini selesai)
+                    for(auto& fw:walls) if(fw.alive&&!fw.isFrozen&&!fw.waitingDelay) fw.isFrozen=true; // bekuin semua wall lain yang masih gerak (biar gak tambah runyam pas kena damage)
+                    takeDamage();                                        // pemain kena damage karena ketabrak dari samping
                 }
             }
-            for(auto& r:pending) walls.push_back(r);              // masukkan platform pengganti yang tadi disiapkan
-            player.onGround=onGnd;
-            if(onGnd){ player.standingY=floor; player.pos.y=floor; player.velY=0; } // kalau menapak, kunci posisi Y ke permukaan pijakan
-            if(nextSpawn&&gameState==PLAYING) spawnWall(false,0.15f); // platform baru diinjak -> munculkan platform berikutnya (delay singkat)
-            wallSpeed=std::min(5.5f+(float)wallsPassed*0.45f,22.f);   // makin tinggi skor, platform makin cepat (maksimal 22)
+            for(auto& r:pending) walls.push_back(r);                     // baru sekarang masukin wall pengganti yang tadi ke daftar walls
+            player.onGround=onGnd;                                      // update status "lagi di tanah/platform" pemain
+            if(onGnd){ player.standingY=floor; player.pos.y=floor; player.velY=0; } // kalau lagi berpijak, update ketinggian pijakan terakhir
+            if(nextSpawn&&gameState==PLAYING) spawnWall(false,0.15f);    // kalau abis dapet skor, munculin wall baru berikutnya (dengan delay dikit)
 
-            // -----------------------------------------------------------------
-            // ★★★ BAGIAN ROKET: SPAWN, UPDATE, & TABRAKAN ★★★
-            // -----------------------------------------------------------------
-            int ms=wallsPassed/10;                                  // hitung "level milestone": tiap kelipatan 10 skor
-            if(ms>0&&ms>lastMilestone){                             // kalau baru saja mencapai milestone baru (misal skor 10, 20, 30...)
-                lastMilestone=ms;                                    // catat milestone ini supaya tidak trigger berulang
-                std::mt19937 rng(std::random_device{}());            // generator angka acak
-                std::uniform_real_distribution<float> xd(-5.5f,5.5f); // distribusi posisi X acak, dalam rentang arena
-                std::uniform_int_distribution<int> countd(1,2);       // distribusi JUMLAH roket acak: hasilnya 1 atau 2
-                int rocketCount=countd(rng);                          // undi sekali: dapat 1 atau 2 roket untuk milestone ini
-                for(int k=0;k<rocketCount;k++)                        // setiap milestone, spawn SEACAK rocketCount roket (bisa 1, bisa 2)
-                    rockets.push_back({
-                        xd(rng),                  // x: posisi horizontal acak
-                        player.pos.y+8.f,         // y: mulai jauh di ATAS posisi pemain saat ini (di luar layar atas)
-                        -(7.f+ms*.3f),             // velY: NEGATIF -> roket bergerak TURUN, makin tinggi milestone makin cepat turunnya
-                        0,                          // trail: timer animasi api, mulai dari 0
-                        true                        // alive: aktif
-                    });
+            // ///////////////////////// TAMBAH KESULITAN SEIRING SKOR /////////////////////////
+            wallSpeed=std::min(5.5f+(float)wallsPassed*0.45f,22.f);      // makin banyak skor, wall makin cepet gerak (tapi dibatesin max 22)
+
+            // ///////////////////// ROKET (MUNCUL TIAP KELIPATAN SKOR TERTENTU) ////////////////
+            int ms=wallsPassed/5;                                      // hitung "level milestone" (tiap 10 skor naik 1 level)
+            if(ms>0&&ms>lastMilestone){                                  // kalau level milestone-nya baru (belum pernah dicapai sebelumnya)
+                lastMilestone=ms;                                        // update milestone terakhir
+                std::mt19937 rng(std::random_device{}());               // siapin generator angka acak
+                std::uniform_real_distribution<float> xd(-5.5f,5.5f);    // rentang posisi x acak buat roket
+                for(int k=0;k<2;k++) rockets.push_back({xd(rng), player.pos.y+8.f, -(7.f+ms*.3f), 0, true}); // munculin 2 roket di atas pemain, meluncur turun makin cepet seiring level makin tinggi
             }
-            for(auto& r:rockets){                                    // update posisi & cek tabrakan tiap roket aktif
-                if(!r.alive) continue;                                 // lewati roket yang sudah tidak aktif
-                r.y+=r.velY*dt; r.trail+=dt;                           // gerakkan roket sesuai velY (turun), update timer animasi api
-                if(r.y<player.standingY-2){ r.alive=false; continue; } // kalau roket sudah jauh di bawah pijakan pemain -> matikan (hemat resource, tidak perlu digambar/cek lagi)
-                if(hitCooldown<=0                                      // hanya kena damage kalau pemain tidak sedang kebal
-                   &&fabs(r.x-player.pos.x)<PHW+0.25f                  // dan posisi X roket dekat dengan pemain (overlap horizontal)
-                   &&r.y>=player.pos.y-.1f&&r.y<=player.pos.y+PH+.2f){ // dan posisi Y roket setinggi badan pemain (overlap vertikal)
-                    r.alive=false; takeDamage();                       // roket "meledak" (hilang) dan pemain kena damage
+            for(auto& r:rockets){                                       // update posisi & cek tabrakan tiap roket
+                if(!r.alive) continue;                                  // skip roket yang udah gak aktif
+                r.y+=r.velY*dt; r.trail+=dt;                             // gerakin roket turun, & update timer buat animasi api
+                if(r.y<player.standingY-2){ r.alive=false; continue; }   // kalau roket udah kelewat jauh ke bawah, matiin (gak kepake lagi)
+                if(hitCooldown<=0&&fabs(r.x-player.pos.x)<PHW+0.25f&&r.y>=player.pos.y-.1f&&r.y<=player.pos.y+PH+.2f){ // cek apakah roket nabrak badan pemain
+                    r.alive=false; takeDamage();                         // kalau kena, roket ilang & pemain kena damage
                 }
             }
-            // buang semua roket yang statusnya alive=false dari vector (bersihkan memori)
-            rockets.erase(std::remove_if(rockets.begin(),rockets.end(),[](const Rocket& r){return !r.alive;}),rockets.end());
-            // -----------------------------------------------------------------
-            // ★★★ AKHIR BAGIAN ROKET UTAMA (nanti roket masih digambar & ditampilkan
-            //     peringatannya di bagian render & HUD di bawah) ★★★
-            // -----------------------------------------------------------------
+            rockets.erase(std::remove_if(rockets.begin(),rockets.end(),[](const Rocket& r){return !r.alive;}),rockets.end()); // beneran hapus semua roket yang udah gak aktif dari list (biar list-nya gak numpuk)
 
-            // --- UPDATE POSISI PLATFORM (WALL) ---
+            // ///////////////////////// UPDATE GERAK SEMUA WALL /////////////////////////
             for(size_t i=0;i<walls.size();i++){
-                if(!walls[i].alive) continue;
-                if(walls[i].waitingDelay){                            // platform masih dalam masa tunggu (delay)
-                    walls[i].delayTimer-=dt;
-                    if(walls[i].delayTimer<=0){                        // waktu tunggu habis -> aktifkan platform, taruh di tepi layar
-                        walls[i].waitingDelay=false;
-                        walls[i].x=walls[i].speedSign<0?16.f:-16.f;
-                    }
+                if(!walls[i].alive) continue;                            // skip wall yang udah gak aktif
+                if(walls[i].waitingDelay){                               // kalau wall ini masih dalam masa nunggu delay
+                    walls[i].delayTimer-=dt;                             // kurangin timer delay-nya
+                    if(walls[i].delayTimer<=0){ walls[i].waitingDelay=false; walls[i].x=walls[i].speedSign<0?16.f:-16.f; } // kalau delay abis, munculin wall-nya di tepi layar sesuai arah geraknya
                     continue;
                 }
-                if(!walls[i].isFrozen) walls[i].x+=walls[i].speedSign*wallSpeed*dt; // gerakkan platform kalau tidak sedang beku
-                bool out=(walls[i].speedSign<0&&walls[i].x<-16)||(walls[i].speedSign>0&&walls[i].x>16); // cek apakah sudah keluar layar
-                if(out&&!walls[i].isFrozen){ walls[i].alive=false; spawnWall(true,0.5f); } // kalau keluar layar -> hapus & spawn platform baru di sisi yang sama
+                if(!walls[i].isFrozen) walls[i].x+=walls[i].speedSign*wallSpeed*dt; // kalau wall belum beku, gerakin sesuai arah & kecepatannya
+                bool out=(walls[i].speedSign<0&&walls[i].x<-16)||(walls[i].speedSign>0&&walls[i].x>16); // cek apakah wall udah keluar layar
+                if(out&&!walls[i].isFrozen){ walls[i].alive=false; spawnWall(true,0.5f); } // kalau keluar layar & belum beku, matiin wall ini & munculin wall baru pengganti (arah sama)
             }
 
-            // --- UPDATE KAMERA MENGIKUTI PEMAIN ---
-            camTargetY=player.pos.y+2.5f;                           // target tinggi kamera = tinggi pemain + offset
-            camPos.y+=(camTargetY-camPos.y)*8.f*dt;                 // gerakkan kamera perlahan (smooth follow / lerp) menuju target
+            // ///////////////////////// KAMERA NGIKUTIN PEMAIN /////////////////////////
+            camTargetY=player.pos.y+2.5f;                                // target ketinggian kamera = posisi pemain + offset
+            camPos.y+=(camTargetY-camPos.y)*8.f*dt;                      // gerakin kamera pelan2 (smooth/lerp) menuju target, biar gerakannya halus gak kaku
         }
 
-        // --- UPDATE JUDUL WINDOW SESUAI STATUS GAME ---
+        // ------------------------- UPDATE JUDUL WINDOW (info skor/status) -------------------------
         std::string title;
         if(gameState==PLAYING) title="Sylvan Odyssey | Score:"+std::to_string(wallsPassed)+" | Lives:"+std::to_string(playerLives)+" | ESC=Pause";
         else if(gameState==PAUSED) title="PAUSED | ESC=Resume | R=Restart";
         else title="GAME OVER | Score:"+std::to_string(wallsPassed)+" | R=Restart";
-        glfwSetWindowTitle(win,title.c_str());
+        glfwSetWindowTitle(win,title.c_str());                          // judul window diupdate sesuai status game sekarang
 
-        // ================= MULAI RENDER FRAME =================
-        float camOff=camPos.y-2.5f;                                // offset kamera dari posisi awal, dipakai untuk gerakkan background ikut naik
-        glClearColor(0.38f,0.62f,0.88f,1);                         // warna bersih layar (biru langit dasar)
-        glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);          // bersihkan buffer warna & depth sebelum gambar frame baru
+        // =============================== BAGIAN GAMBAR (RENDER) ===============================
+        float camOff=camPos.y-2.5f;                                     // hitung offset kamera dari posisi awal (buat geser objek statis biar ikut "naik" seolah kamera diem)
+        glClearColor(0.38f,0.62f,0.88f,1);                              // warna background dibersihin ke warna biru langit
+        glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);               // bersihin layar & depth buffer sebelum gambar frame baru
+        glm::mat4 proj=glm::perspective(glm::radians(62.f),(float)SCR_W/SCR_H,0.1f,100.f); // bikin matrix proyeksi perspektif (biar keliatan 3D, objek jauh keliatan kecil)
+        glm::mat4 view=glm::lookAt(camPos,camPos+camFront,camUp);       // bikin matrix kamera (posisi kamera, arah liat, arah atas)
+        setUniforms(shaderProg,proj,view);                              // kirim kedua matrix itu ke shader utama
+        glUniform3fv(glGetUniformLocation(shaderProg,"lightPos"),1,glm::value_ptr(lightPos));     // kirim posisi cahaya
+        glUniform3fv(glGetUniformLocation(shaderProg,"lightColor"),1,glm::value_ptr(lightColor)); // kirim warna cahaya
 
-        glm::mat4 proj=glm::perspective(glm::radians(62.f),(float)SCR_W/SCR_H,0.1f,100.f); // matriks proyeksi perspektif (field of view 62°)
-        glm::mat4 view=glm::lookAt(camPos,camPos+camFront,camUp);  // matriks kamera (lihat dari camPos ke arah camFront)
-        setUniforms(shaderProg,proj,view);
-        glUniform3fv(glGetUniformLocation(shaderProg,"lightPos"),1,glm::value_ptr(lightPos));
-        glUniform3fv(glGetUniformLocation(shaderProg,"lightColor"),1,glm::value_ptr(lightColor));
-
-        // --- GAMBAR LATAR: LANGIT, MATAHARI, TANAH ---
-        drawCube(shaderProg,{0,3.5f+camOff,-9},{22,20,0.3f},COL_SKY);        // panel langit besar di kejauhan
+        // //////////////////////// GAMBAR LATAR (LANGIT, MATAHARI, TANAH) ////////////////////////
+        drawCube(shaderProg,{0,3.5f+camOff,-9},{22,20,0.3f},COL_SKY);        // panel langit besar di belakang
         drawCube(shaderProg,{0,6.5f+camOff,-7},{0.6f,0.6f,0.2f},COL_SUN);    // matahari
-        drawCube(shaderProg,{0,-0.3f,0},{15,0.3f,2.5f},COL_GROUND);          // tanah
-        drawCube(shaderProg,{0,0.02f,0},{15,0.05f,2.5f},COL_GROUND_TOP);     // lapisan rumput tipis di atas tanah
-        setUniforms(shaderProg,proj,view);
+        drawCube(shaderProg,{0,-0.3f,0},{15,0.3f,2.5f},COL_GROUND);         // lantai/tanah
+        drawCube(shaderProg,{0,0.02f,0},{15,0.05f,2.5f},COL_GROUND_TOP);    // lapisan rumput tipis di atas tanah
+        setUniforms(shaderProg,proj,view);                                  // set ulang uniform (karena abis drawCube uniform "model" dll udah keganti)
 
-        // --- GAMBAR SEMUA PLATFORM (WALL) ---
+        // //////////////////////////////// GAMBAR SEMUA WALL ////////////////////////////////
         for(auto& w:walls){
-            if(!w.alive||w.waitingDelay) continue;
-            glm::vec3 wc=w.isFrozen?COL_WALL*0.82f:COL_WALL;               // platform beku sedikit lebih gelap
+            if(!w.alive||w.waitingDelay) continue;                        // skip wall yang gak aktif / masih nunggu delay
+            glm::vec3 wc=w.isFrozen?COL_WALL*0.82f:COL_WALL;                // kalau wall lagi beku, warnanya sedikit lebih gelap (biar keliatan beda)
             glm::vec3 edge=w.isFrozen?COL_WALL_EDGE*0.82f:COL_WALL_EDGE;
-            drawCube(shaderProg,{w.x,w.y,0},{w.width,w.height,0.55f},wc);           // badan platform
-            drawCube(shaderProg,{w.x,w.y+w.height,0},{w.width+0.02f,0.02f,0.58f},edge); // garis tepi atas platform
+            drawCube(shaderProg,{w.x,w.y,0},{w.width,w.height,0.55f},wc);              // badan wall
+            drawCube(shaderProg,{w.x,w.y+w.height,0},{w.width+0.02f,0.02f,0.58f},edge); // garis tepi/edge di atas wall
         }
 
-        // --- GAMBAR BAYANGAN LONJONG DI BAWAH PEMAIN ---
+        // ///////////////////////////////// BAYANGAN PEMAIN /////////////////////////////////
         {
-            setUniforms(shadowProg,proj,view);
-            float sf=GROUND_Y;                                              // sf = permukaan tertinggi tepat di bawah pemain (default tanah)
-            for(auto& w:walls)
-                if(w.alive&&!w.waitingDelay&&w.y+w.height<=player.pos.y+0.02f&&fabs(player.pos.x-w.x)<PHW+w.width)
-                    sf=std::max(sf,w.y+w.height);                            // cari platform tertinggi di bawah pemain untuk taruh bayangan
-            float h=std::max(player.pos.y-sf,0.f);                          // ketinggian pemain relatif ke permukaan tersebut
-            float rX=std::max(0.55f-h*.045f,.18f), rZ=std::max(0.32f-h*.025f,.10f), al=std::max(0.85f-h*.07f,.15f), sy=sf+0.08f; // bayangan mengecil & memudar makin tinggi pemain melompat
-            glUniform3f(glGetUniformLocation(shadowProg,"shadowCenter"),player.pos.x,sy,player.pos.z);
-            glUniform2f(glGetUniformLocation(shadowProg,"shadowRadius"),rX,rZ);
-            glUniform1f(glGetUniformLocation(shadowProg,"alpha"),al);
-            glDepthMask(GL_FALSE);                                          // matikan penulisan depth buffer supaya bayangan tidak "menutupi" objek lain secara aneh
-            glm::mat4 sm=glm::scale(glm::translate(glm::mat4(1),{player.pos.x,sy,player.pos.z}),{rX*2.2f,0.005f,rZ*2.2f}); // kubus super pipih = jadi elips bayangan
+            setUniforms(shadowProg,proj,view);                              // pindah pakai shader khusus bayangan
+            float sf=GROUND_Y;                                              // sf = ketinggian permukaan tempat bayangan bakal digambar (default lantai)
+            for(auto& w:walls)                                              // cari wall tertinggi yang ada tepat di bawah pemain (buat bayangan nempel di situ, bukan tembus wall)
+                if(w.alive&&!w.waitingDelay&&w.y+w.height<=player.pos.y+0.02f&&fabs(player.pos.x-w.x)<PHW+w.width) sf=std::max(sf,w.y+w.height);
+            float h=std::max(player.pos.y-sf,0.f);                          // hitung seberapa tinggi pemain dari permukaan bayangan
+            float rX=std::max(0.55f-h*.045f,.18f), rZ=std::max(0.32f-h*.025f,.10f), al=std::max(0.85f-h*.07f,.15f), sy=sf+0.08f; // makin tinggi pemain, bayangan makin kecil & makin transparan (efek realistis)
+            glUniform3f(glGetUniformLocation(shadowProg,"shadowCenter"),player.pos.x,sy,player.pos.z); // kirim posisi tengah bayangan
+            glUniform2f(glGetUniformLocation(shadowProg,"shadowRadius"),rX,rZ);   // kirim ukuran radius bayangan
+            glUniform1f(glGetUniformLocation(shadowProg,"alpha"),al);            // kirim transparansi bayangan
+            glDepthMask(GL_FALSE);                                               // matiin depth write sementara biar bayangan nempel rata di permukaan (gak "ketiban" masalah z-fighting)
+            glm::mat4 sm=glm::scale(glm::translate(glm::mat4(1),{player.pos.x,sy,player.pos.z}),{rX*2.2f,0.005f,rZ*2.2f}); // bikin matrix bayangan (pipih banget di sumbu y)
             glUniformMatrix4fv(glGetUniformLocation(shadowProg,"model"),1,GL_FALSE,glm::value_ptr(sm));
-            glDrawArrays(GL_TRIANGLES,0,36);
-            glDepthMask(GL_TRUE);                                           // nyalakan lagi depth mask untuk objek berikutnya
-            setUniforms(shaderProg,proj,view);                              // kembali ke shader utama untuk lanjut gambar objek biasa
+            glDrawArrays(GL_TRIANGLES,0,36);                                     // gambar bayangannya
+            glDepthMask(GL_TRUE);                                               // nyalain lagi depth write buat gambar objek selanjutnya
+            setUniforms(shaderProg,proj,view);                                  // balik lagi pakai shader utama
         }
 
-        // -----------------------------------------------------------------
-        // ★★★ GAMBAR SEMUA ROKET AKTIF ★★★
-        // Tiap roket digambar dari 4 kubus terpisah yang ditumpuk vertikal:
-        //   1) badan roket (silinder panjang, disederhanakan jadi kubus)
-        //   2) hidung/ujung roket (di bawah badan, mengarah ke bawah karena roket "jatuh")
-        //   3) sirip roket (agak di atas badan)
-        //   4) nyala api knalpot yang berkedip-kedip (paling atas, karena roket
-        //      turun dengan "belakang"/apinya menghadap ke atas)
-        // -----------------------------------------------------------------
+        // //////////////////////////////////// GAMBAR ROKET ////////////////////////////////////
         for(auto& r:rockets){
-            if(!r.alive) continue;                                          // lewati roket tidak aktif
-            float t=(float)glfwGetTime();                                   // waktu global, dipakai untuk animasi kedip api
-            float fl=0.15f+0.1f*sinf(t*20+r.x*3);                           // ukuran api berosilasi (efek berkedip), fase digeser oleh posisi x supaya tiap roket tidak sinkron
-            drawCube(shaderProg,{r.x,r.y,0},      {0.18f,0.75f,0.18f},COL_ROCKET_BODY); // badan roket: silinder ramping (tinggi jauh lebih besar dari lebar)
-            drawCube(shaderProg,{r.x,r.y-0.6f,0}, {0.12f,0.25f,0.12f},COL_ROCKET_NOSE); // hidung roket, ditaruh di bawah badan (karena roket menghadap turun)
-            drawCube(shaderProg,{r.x,r.y+0.4f,0}, {0.34f,0.14f,0.14f},COL_ROCKET_FIN);  // sirip roket, lebih lebar & pipih, di atas badan
-            drawCube(shaderProg,{r.x,r.y+0.85f,0},{fl,0.3f,fl},COL_FLAME,0.85f);        // api knalpot di ujung paling atas, ukurannya berkedip (variabel fl), sedikit transparan (alpha 0.85)
+            if(!r.alive) continue;                                        // skip roket yang gak aktif
+            float t=(float)glfwGetTime();                                 // ambil waktu sekarang buat animasi
+            float fl=0.15f+0.1f*sinf(t*20+r.x*3);                        // hitung ukuran api yang "berkedip"/bergetar pakai fungsi sin (biar keliatan hidup nyalanya)
+            drawCube(shaderProg,{r.x,r.y,0},      {0.18f,0.75f,0.18f},COL_ROCKET_BODY); // badan roket
+            drawCube(shaderProg,{r.x,r.y-0.6f,0}, {0.12f,0.25f,0.12f},COL_ROCKET_NOSE); // hidung/ujung roket
+            drawCube(shaderProg,{r.x,r.y+0.4f,0}, {0.34f,0.14f,0.14f},COL_ROCKET_FIN);  // sirip roket
+            drawCube(shaderProg,{r.x,r.y+0.85f,0},{fl,0.3f,fl},COL_FLAME,0.85f);        // api ekor roket (ukurannya berubah2/animasi)
         }
+        drawPlayer(shaderProg,player.pos,0.58f);                         // gambar karakter pemain di posisinya sekarang
 
-        // --- GAMBAR PEMAIN (dengan animasi jalan sederhana) ---
-        float leg=player.onGround?sinf(player.animTimer*3)*8.f:-22.f;   // kalau menapak, kaki berayun sinus; kalau di udara, kaki menekuk tetap (-22°)
-        float arm=player.onGround?sinf(player.animTimer*3)*8.f:-30.f;   // sama untuk tangan
-        drawPlayer(shaderProg,player.pos,0.58f,leg,arm);
-
-        // ================= GAMBAR HUD (Head-Up Display) 2D =================
+        // =============================== HUD (TEKS & INFO DI LAYAR) ===============================
         {
-            glDisable(GL_DEPTH_TEST);                                       // matikan depth test supaya HUD selalu tampil di atas dunia 3D
-            glm::mat4 hudP=glm::ortho(0.f,(float)SCR_W,(float)SCR_H,0.f,-1.f,1.f); // proyeksi ortografis 2D (koordinat piksel layar)
+            glDisable(GL_DEPTH_TEST);                                    // matiin depth test biar HUD selalu di depan (gak ketiban objek 3D)
+            glm::mat4 hudP=glm::ortho(0.f,(float)SCR_W,(float)SCR_H,0.f,-1.f,1.f); // proyeksi 2D biasa (bukan perspektif) khusus buat HUD
             glUseProgram(fontProg);
-            glUniformMatrix4fv(glGetUniformLocation(fontProg,"proj"),1,GL_FALSE,glm::value_ptr(hudP));
-            float sc=2, cw=16, ch=16;                                       // skala teks, lebar/tinggi 1 karakter dalam piksel
-
-            renderRect(0,0,(float)SCR_W,ch+14,0.03f,0.08f,0.04f,0.88f);     // bar gelap transparan di bagian atas layar (latar HUD)
-            renderRect(0,ch+12,(float)SCR_W,2,0.22f,0.68f,0.3f,0.6f);       // garis hijau tipis pemisah HUD
-
-            for(int i=0;i<5;i++) renderHeart(10+i*32,5,sc*.9f,i<playerLives); // gambar 5 ikon hati, terisi sesuai sisa nyawa
-
+            glUniformMatrix4fv(glGetUniformLocation(fontProg,"proj"),1,GL_FALSE,glm::value_ptr(hudP)); // kirim proyeksi 2D ke shader font
+            float sc=2, cw=16, ch=16;                                    // sc = skala ukuran teks, cw/ch = lebar/tinggi per karakter di layar
+            renderRect(0,0,(float)SCR_W,ch+14,0.03f,0.08f,0.04f,0.88f);  // gambar background bar atas (buat taruh skor & info)
+            renderRect(0,ch+12,(float)SCR_W,2,0.22f,0.68f,0.3f,0.6f);    // garis tipis pembatas bar atas
+            for(int i=0;i<5;i++) renderHeart(10+i*32,5,sc*.9f,i<playerLives); // gambar 5 icon hati, yang aktif sebanyak sisa nyawa pemain
             std::string sc_str="SCORE: "+std::to_string(wallsPassed);
-            renderText(sc_str,SCR_W/2.f-sc_str.size()*cw/2,5,sc,0.7f,0.98f,0.72f); // skor di tengah atas
-
-            renderText("A/D=MOVE  ESC=PAUSE",SCR_W-10-20*cw,5,sc,0.4f,0.6f,0.42f,0.8f); // petunjuk kontrol di kanan atas
-
-            // ★ Peringatan ROKET di HUD: muncul selama masih ada roket aktif di layar
-            if(!rockets.empty()){
+            renderText(sc_str,SCR_W/2.f-sc_str.size()*cw/2,5,sc,0.7f,0.98f,0.72f); // tampilin skor di tengah atas
+            renderText("A/D=MOVE  ESC=PAUSE",SCR_W-10-20*cw,5,sc,0.4f,0.6f,0.42f,0.8f); // tampilin petunjuk kontrol di pojok kanan atas
+            if(!rockets.empty()){                                       // kalau lagi ada roket yang mengincar
                 std::string w2="!! ROCKET INCOMING !!";
-                renderText(w2,SCR_W/2.f-w2.size()*cw*.8f/2,ch+20,.8f*sc,1,.3f,.05f); // teks merah peringatan di bawah bar skor
+                renderText(w2,SCR_W/2.f-w2.size()*cw*.8f/2,ch+20,.8f*sc,1,.3f,.05f); // munculin peringatan roket di layar
             }
-
-            // Efek layar berkedip merah saat pemain baru saja kena damage (hitCooldown aktif)
-            if(hitCooldown>0){
-                float fl2=fmodf(hitCooldown*6,1)>.5f?.35f:0;                 // berkedip on/off dengan frekuensi berdasar sisa cooldown
+            if(hitCooldown>0){                                           // kalau lagi masa kebal abis kena hit
+                float fl2=fmodf(hitCooldown*6,1)>.5f?.35f:0;             // bikin layar berkedip merah (efek "kena damage") pake modulo waktu
                 renderRect(0,0,(float)SCR_W,(float)SCR_H,0.9f,0.1f,0.1f,fl2);
             }
-
-            // Layar PAUSE
+            // ///////////////////////////// TAMPILAN PAUSE /////////////////////////////
             if(gameState==PAUSED){
-                float ox=SCR_W/2.f, oy=SCR_H/2.f;                            // titik tengah layar
-                renderRect(0,0,(float)SCR_W,(float)SCR_H,0.02f,0.06f,0.03f,0.72f); // overlay gelap seluruh layar
-                renderRect(ox-155,oy-95,310,190,0.04f,0.11f,0.06f,0.97f);    // kotak panel pause
-                renderText("PAUSED",ox-6*8*3.f/2,oy-60,3,0.32f,0.98f,0.48f);
-                renderText("ESC/P - RESUME",ox-14*8*1.5f/2,oy,1.5f,0.72f,0.92f,0.74f);
-                renderText("R - RESTART",ox-11*8*1.5f/2,oy+30,1.5f,0.72f,0.92f,0.74f);
-                renderText("SCORE "+std::to_string(wallsPassed),ox-8*8*1.5f/2,oy+60,1.5f,0.5f,0.72f,0.52f);
+                float ox=SCR_W/2.f, oy=SCR_H/2.f;                        // titik tengah layar
+                renderRect(0,0,(float)SCR_W,(float)SCR_H,0.02f,0.06f,0.03f,0.72f); // overlay gelap penuh layar
+                renderRect(ox-155,oy-95,310,190,0.04f,0.11f,0.06f,0.97f);          // kotak panel pause di tengah
+                renderText("PAUSED",ox-6*8*3.f/2,oy-60,3,0.32f,0.98f,0.48f);       // judul "PAUSED"
+                renderText("ESC/P - RESUME",ox-14*8*1.5f/2,oy,1.5f,0.72f,0.92f,0.74f); // petunjuk resume
+                renderText("R - RESTART",ox-11*8*1.5f/2,oy+30,1.5f,0.72f,0.92f,0.74f); // petunjuk restart
+                renderText("SCORE "+std::to_string(wallsPassed),ox-8*8*1.5f/2,oy+60,1.5f,0.5f,0.72f,0.52f); // skor saat pause
             }
-
-            // Layar GAME OVER
+            // ///////////////////////////// TAMPILAN GAME OVER /////////////////////////////
             if(gameState==GAME_OVER){
                 float ox=SCR_W/2.f, oy=SCR_H/2.f;
-                renderRect(0,0,(float)SCR_W,(float)SCR_H,0.05f,0.01f,0.01f,0.75f); // overlay merah gelap
-                renderRect(ox-180,oy-115,360,230,0.1f,0.02f,0.02f,0.97f);    // kotak panel game over
+                renderRect(0,0,(float)SCR_W,(float)SCR_H,0.05f,0.01f,0.01f,0.75f); // overlay merah gelap penuh layar
+                renderRect(ox-180,oy-115,360,230,0.1f,0.02f,0.02f,0.97f);          // kotak panel game over
                 renderText("GAME  OVER",ox-10*8*3.f/2,oy-90,3,0.98f,0.18f,0.18f);
                 renderText("THE CANOPY CLAIMED YOU",ox-22*8*1.6f/2,oy-45,1.6f,0.75f,0.4f,0.4f);
                 renderText("SCORE: "+std::to_string(wallsPassed),ox-7*8*1.8f/2,oy-10,1.8f,.88f,.62f,.62f);
                 renderText("PRESS R TO RESTART",ox-18*8*1.5f/2,oy+44,1.5f,1,.92f,.92f);
                 renderText("PRESS M FOR MENU",ox-16*8*1.5f/2,oy+64,1.5f,.8f,.72f,.72f);
             }
-            glEnable(GL_DEPTH_TEST);                                        // nyalakan lagi depth test untuk frame 3D berikutnya
+            glEnable(GL_DEPTH_TEST);                                     // nyalain lagi depth test buat frame 3D berikutnya
         }
-
-        glfwSwapBuffers(win);   // tukar buffer belakang<->depan (tampilkan frame yang baru selesai digambar)
-        glfwPollEvents();       // proses semua event yang masuk (keyboard, close window, dll)
+        glfwSwapBuffers(win);                                            // tampilin hasil gambar frame ini ke layar (double buffering)
+        glfwPollEvents();                                                // proses event2 window (keyboard, close, dll)
     }
-    // ============================= AKHIR GAME LOOP =============================
-
-    glDeleteVertexArrays(1,&VAO); glDeleteBuffers(1,&VBO); // bersihkan resource GPU
-    glfwTerminate();                                        // matikan GLFW
-    return g_backToMenu;                                    // true kalau keluar karena tombol M (balik ke menu), false kalau window ditutup paksa
+    // ---- keluar dari game loop (window ditutup atau pindah menu) ----
+    glDeleteVertexArrays(1,&VAO); glDeleteBuffers(1,&VBO);               // bersihin resource OpenGL yang tadi dibikin
+    glfwTerminate();                                                     // matiin GLFW
+    return g_backToMenu;                                                 // balikin true kalau pemain minta balik ke menu (false kalau window ditutup paksa/exit total)
 }
 
-// ----------------------------------------------------------------------------
-// Bagian bawah ini mengurus jendela MENU (webview HTML), bukan game 3D-nya.
-// ----------------------------------------------------------------------------
-static std::atomic<bool> g_startGame{false}, g_exit{false}; // flag hasil klik tombol menu, aman diakses lintas callback
-
-// onMenuInvoke(): dipanggil saat tombol di HTML menu diklik (lewat window.external.invoke)
-void onMenuInvoke(struct webview* w,const char* arg){
-    std::string cmd(arg);                                    // isi argumen sesuai nama tombol yang diklik
-    if(cmd=="startGame"){ g_startGame=true; webview_terminate(w); }  // tombol Start -> set flag, tutup webview
-    else if(cmd=="options") webview_eval(w,"alert('HOW TO PLAY\\n\\nSPACE/W/UP = Jump\\nA/D = Move\\n\\nLompat ke platform bergerak untuk naik.\\nHindari platform yang menabrak dari samping!\\n\\nESC/P = Pause  |  R = Restart  |  M = Menu');"); // tombol How To Play -> munculkan alert petunjuk lewat JS
-    else if(cmd=="exit"){ g_exit=true; webview_terminate(w); }       // tombol Exit -> set flag keluar, tutup webview
+// =====================================================================================
+// //////////////////////////////////// MENU & WEBVIEW /////////////////////////////////
+// Bagian ini ngatur jendela MENU (pakai webview/HTML), bukan game 3D-nya
+// =====================================================================================
+static std::atomic<bool> g_startGame{false}, g_exit{false};              // penanda global: pemain klik "Start Journey" atau "Exit" di menu
+void onMenuInvoke(struct webview* w,const char* arg){                    // fungsi ini dipanggil pas ada tombol HTML yang diklik (dari window.external.invoke di HTML)
+    std::string cmd(arg);                                                // arg = perintah yang dikirim dari HTML ("startGame"/"options"/"exit")
+    if(cmd=="startGame"){ g_startGame=true; webview_terminate(w); }       // kalau start, set penanda & tutup webview (biar lanjut ke game)
+    else if(cmd=="options") webview_eval(w,"alert('HOW TO PLAY\\n\\nSPACE/W/UP = Jump\\nA/D = Move\\n\\nLompat ke platform bergerak untuk naik.\\nHindari platform yang menabrak dari samping!\\n\\nESC/P = Pause  |  R = Restart  |  M = Menu');"); // kalau klik "how to play", munculin alert JS berisi cara main
+    else if(cmd=="exit"){ g_exit=true; webview_terminate(w); }            // kalau exit, set penanda & tutup webview (program berhenti total)
 }
 
-// makeDataUrl(): mengubah string HTML menjadi "data: URL" (URL-encode) supaya
-// bisa langsung dimuat oleh webview tanpa perlu file HTML terpisah.
-static std::string makeDataUrl(const char* html){
+static std::string makeDataUrl(const char* html){                        // fungsi buat ubah string HTML mentah jadi URL "data:text/html,..." biar bisa dibuka webview tanpa file terpisah
     std::string out="data:text/html,";
-    for(const char* p=html;*p;++p){                          // loop tiap karakter dalam HTML
+    for(const char* p=html;*p;++p){                                      // loop tiap karakter di HTML
         unsigned char c=(unsigned char)*p;
-        if(isalnum(c)||strchr("-_.!~*'()/:@,;?=&#+ ",c)) out+=(char)c; // karakter "aman" langsung disalin apa adanya
-        else{ char b[4]; snprintf(b,4,"%%%02X",c); out+=b; }   // karakter lain di-encode jadi %XX (percent-encoding)
+        if(isalnum(c)||strchr("-_.!~*'()/:@,;?=&#+ ",c)) out+=(char)c;   // kalau karakternya aman (huruf/angka/simbol umum), langsung tempel apa adanya
+        else{ char b[4]; snprintf(b,4,"%%%02X",c); out+=b; }             // kalau karakternya "berbahaya" buat URL (misal <, >, "), diubah jadi kode %XX (URL encoding)
     }
-    return out;
+    return out;                                                          // hasil akhirnya string URL yang siap dipakai webview
 }
 
+// ///////////////////////// POSISIIN WINDOW MENU DI TENGAH LAYAR /////////////////////////
 #if defined(_WIN32)||defined(_WIN64)
-// centerWebview() versi Windows: memposisikan window webview di tengah layar
-static void centerWebview(struct webview* wv){
-    HWND h=(HWND)wv->priv.hwnd; if(!h) return;               // ambil handle native window Windows
+static void centerWebview(struct webview* wv){                           // khusus windows: pindahin window webview ke tengah layar
+    HWND h=(HWND)wv->priv.hwnd; if(!h) return;                           // ambil handle window-nya, kalau gak ada ya keluar
     int sw=GetSystemMetrics(SM_CXSCREEN),sh=GetSystemMetrics(SM_CYSCREEN); // ukuran layar
-    RECT r; GetWindowRect(h,&r);                              // ukuran window saat ini
-    SetWindowPos(h,NULL,(sw-(r.right-r.left))/2,(sh-(r.bottom-r.top))/2,0,0,SWP_NOSIZE|SWP_NOZORDER); // pindahkan ke tengah
+    RECT r; GetWindowRect(h,&r);                                        // ukuran window sekarang
+    SetWindowPos(h,NULL,(sw-(r.right-r.left))/2,(sh-(r.bottom-r.top))/2,0,0,SWP_NOSIZE|SWP_NOZORDER); // geser window ke tengah
 }
 #else
-static void centerWebview(struct webview*){}                 // di OS lain, tidak melakukan apa-apa (no-op)
+static void centerWebview(struct webview*){}                            // di OS selain windows, fungsi ini gak ngapa-ngapain (kosong)
 #endif
 
-// ----------------------------------------------------------------------------
-// main(): alur program keseluruhan -> tampilkan menu -> kalau Start ditekan,
-// jalankan game 3D -> kalau kembali ke menu (M), ulangi lagi -> kalau Exit,
-// program berhenti.
-// ----------------------------------------------------------------------------
+// =====================================================================================
+// //////////////////////////////////// FUNGSI MAIN() ///////////////////////////////////
+// Alur program: tampilin MENU -> kalau start, sembunyiin menu & jalanin GAME ->
+// kalau dari game balik ke menu (M), ulang lagi ke MENU -> kalau exit, program berhenti
+// =====================================================================================
 int main(){
-    std::string url=makeDataUrl(MENU_HTML);                   // siapkan URL data dari HTML menu (sekali saja, dipakai berulang)
-    while(true){                                                // loop utama: menu <-> game
-        g_startGame=false; g_exit=false;                        // reset flag tiap kali kembali ke menu
-        struct webview menu={};                                 // siapkan struct konfigurasi webview
-        menu.title="Sylvan Odyssey"; menu.url=url.c_str();
-        menu.width=SCR_W; menu.height=SCR_H; menu.resizable=0; menu.external_invoke_cb=onMenuInvoke; // hubungkan callback klik tombol
-        if(webview_init(&menu)!=0) return 1;                    // gagal membuat webview -> keluar dengan kode error
-        centerWebview(&menu);                                    // posisikan window menu di tengah layar
-        while(webview_loop(&menu,1)==0){}                        // jalankan loop event webview sampai ditutup
-        webview_exit(&menu);                                     // bersihkan resource webview
+    std::string url=makeDataUrl(MENU_HTML);                              // siapin URL data buat tampilan menu HTML
+    while(true){                                                         // loop utama program: bolak-balik antara MENU <-> GAME
+        g_startGame=false; g_exit=false;                                 // reset penanda tiap kali balik ke menu
+        struct webview menu={};                                          // bikin objek webview kosong buat window menu
+        menu.title="Sylvan Odyssey"; menu.url=url.c_str();               // set judul & isi (HTML) window menu
+        menu.width=SCR_W; menu.height=SCR_H; menu.resizable=0; menu.external_invoke_cb=onMenuInvoke; // atur ukuran, gak bisa di-resize, & daftarin fungsi callback tombol
+        if(webview_init(&menu)!=0) return 1;                             // buka window menu-nya, kalau gagal langsung keluar program
+        centerWebview(&menu);                                            // posisiin window menu ke tengah layar
+        while(webview_loop(&menu,1)==0){}                                // loop khusus buat jendela menu (jalan terus sampai ditutup/di-terminate)
+        webview_exit(&menu);                                             // bersihin resource webview menu
+        if(g_exit) return 0;                                             // kalau tadi klik "Exit", program berhenti total
+        if(!g_startGame) break;                                          // kalau window ditutup tanpa klik "Start" (misal user klik silang), keluar dari loop juga
 
-        if(g_exit) return 0;                                     // tombol Exit ditekan -> keluar program sepenuhnya
-        if(!g_startGame) break;                                  // window ditutup tanpa klik Start -> keluar dari loop (selesai)
-
+        // ------------- delay dikit + sembunyiin window menu sebelum masuk game -------------
 #if defined(_WIN32)||defined(_WIN64)
-        Sleep(120);                                               // beri jeda sedikit supaya transisi window mulus
-        { HWND h=FindWindowA(NULL,"Sylvan Odyssey"); if(h) ShowWindow(h,SW_HIDE); Sleep(150); } // sembunyikan sisa window menu lama
+        Sleep(120);                                                      // jeda dikit (windows)
+        { HWND h=FindWindowA(NULL,"Sylvan Odyssey"); if(h) ShowWindow(h,SW_HIDE); Sleep(150); } // cari window menu & sembunyiin biar gak numpuk sama window game
 #else
-        usleep(270000);                                           // versi non-Windows: jeda dengan usleep
+        usleep(270000);                                                  // jeda dikit (linux/mac)
 #endif
-        if(!runGame()) break;                                     // jalankan game; kalau keluar BUKAN karena tombol M (kembali ke menu) -> selesai program
-        // kalau runGame() return true (pemain tekan M), loop while(true) berlanjut -> tampilkan menu lagi
+        if(!runGame()) break;                                            // jalanin game-nya! kalau runGame() balikin false (bukan minta balik menu), keluar dari loop -> program selesai
+        // kalau runGame() balikin true (pemain tekan M), loop while(true) ini ngulang lagi -> balik nampilin MENU
     }
-    return 0;                                                     // program selesai dengan normal
+    return 0;                                                            // program selesai dengan normal
 }
